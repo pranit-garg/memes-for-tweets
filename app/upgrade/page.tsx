@@ -75,10 +75,10 @@ export default function UpgradePage() {
             </div>
 
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Upgrade to Premium
+              Never run out of memes
             </h1>
             <p className="text-gray-600">
-              Unlimited meme generation for just $5/month
+              Keep turning tweets into engagement. $5/mo, cancel anytime.
             </p>
           </div>
 
@@ -108,7 +108,7 @@ export default function UpgradePage() {
                     />
                   </svg>
                 </div>
-                <span className="text-gray-700">Unlimited meme generation</span>
+                <span className="text-gray-700">Unlimited meme matching</span>
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -124,7 +124,7 @@ export default function UpgradePage() {
                     />
                   </svg>
                 </div>
-                <span className="text-gray-700">All 100+ meme templates</span>
+                <span className="text-gray-700">100+ templates, always updated</span>
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -140,7 +140,7 @@ export default function UpgradePage() {
                     />
                   </svg>
                 </div>
-                <span className="text-gray-700">AI-powered meme matching</span>
+                <span className="text-gray-700">AI matches meaning, not keywords</span>
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -156,7 +156,7 @@ export default function UpgradePage() {
                     />
                   </svg>
                 </div>
-                <span className="text-gray-700">Cancel anytime</span>
+                <span className="text-gray-700">Cancel anytime, no questions</span>
               </li>
             </ul>
           </div>
@@ -191,7 +191,7 @@ export default function UpgradePage() {
                          text-white font-semibold text-lg rounded-xl hover:opacity-90
                          transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Redirecting to checkout...' : 'Subscribe Now - $5/month'}
+              {isLoading ? 'Redirecting to checkout...' : 'Start matching — $5/mo'}
             </button>
           </form>
 

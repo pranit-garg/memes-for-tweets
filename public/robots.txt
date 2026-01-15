@@ -1,0 +1,10 @@
+# Memes for Tweets - robots.txt
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://memes-for-tweets.vercel.app/sitemap.xml
+
+# Disallow API routes
+Disallow: /api/

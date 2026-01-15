@@ -88,11 +88,10 @@ function SuccessContent() {
         </div>
 
         <h1 className="text-4xl font-bold text-gray-800 mb-3">
-          Welcome to Premium!
+          You&apos;re in.
         </h1>
         <p className="text-lg text-gray-600 mb-8">
-          You now have unlimited access to all meme templates and AI matching.
-          Time to create some viral content!
+          Unlimited meme matching unlocked. Your tweets are about to get a lot more engaging.
         </p>
 
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
@@ -112,7 +111,7 @@ function SuccessContent() {
                   clipRule="evenodd"
                 />
               </svg>
-              Unlimited meme generation
+              Unlimited meme matching
             </li>
             <li className="flex items-center gap-2 text-gray-600">
               <svg
@@ -126,7 +125,7 @@ function SuccessContent() {
                   clipRule="evenodd"
                 />
               </svg>
-              All 100+ meme templates
+              100+ templates, always updated
             </li>
             <li className="flex items-center gap-2 text-gray-600">
               <svg
@@ -140,7 +139,7 @@ function SuccessContent() {
                   clipRule="evenodd"
                 />
               </svg>
-              AI-powered tweet matching
+              Matches meaning, not just keywords
             </li>
           </ul>
         </div>
@@ -151,7 +150,7 @@ function SuccessContent() {
                      text-white font-semibold text-lg rounded-xl hover:opacity-90
                      transition-opacity"
         >
-          Start Creating Memes
+          Match your first tweet
         </Link>
       </div>
     </div>

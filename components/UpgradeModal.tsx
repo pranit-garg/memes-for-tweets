@@ -61,10 +61,10 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
           </div>
 
           <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            You&apos;ve used all free memes!
+            Your tweets deserve better
           </h2>
           <p className="text-gray-600">
-            Upgrade to Premium for unlimited meme generation
+            Keep turning tweets into engagement. Unlimited matching for $5/mo.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   clipRule="evenodd"
                 />
               </svg>
-              Unlimited meme generation
+              Unlimited meme matching
             </li>
             <li className="flex items-center gap-2">
               <svg
@@ -102,7 +102,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   clipRule="evenodd"
                 />
               </svg>
-              Access to all meme templates
+              100+ templates, always updated
             </li>
             <li className="flex items-center gap-2">
               <svg
@@ -116,7 +116,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   clipRule="evenodd"
                 />
               </svg>
-              Cancel anytime
+              Cancel anytime, no questions
             </li>
           </ul>
         </div>
@@ -151,7 +151,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                        text-white font-semibold rounded-xl hover:opacity-90
                        transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Redirecting...' : 'Subscribe Now'}
+            {isLoading ? 'Redirecting...' : 'Start matching — $5/mo'}
           </button>
         </form>
 

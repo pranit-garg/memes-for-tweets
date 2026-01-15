@@ -27,7 +27,7 @@ export default function UsageCounter({
     <div className="text-sm">
       <div className="flex items-center gap-2 mb-1">
         <span className={isLow ? 'text-orange-600 font-medium' : 'text-gray-600'}>
-          {remaining} free meme{remaining !== 1 ? 's' : ''} left
+          {remaining} free match{remaining !== 1 ? 'es' : ''} left
         </span>
         {isLow && remaining > 0 && (
           <a

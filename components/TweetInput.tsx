@@ -29,7 +29,7 @@ export default function TweetInput({
         <textarea
           value={tweet}
           onChange={(e) => setTweet(e.target.value)}
-          placeholder="Paste your tweet here... What did you want to say?"
+          placeholder="What's your tweet about?"
           maxLength={maxLength}
           disabled={disabled}
           className="w-full h-32 p-4 text-lg text-black border-2 border-gray-200 rounded-xl
@@ -73,10 +73,10 @@ export default function TweetInput({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               />
             </svg>
-            Finding perfect memes...
+            Matching your vibe...
           </>
         ) : (
-          'Find Memes'
+          'Match My Tweet'
         )}
       </button>
     </form>
