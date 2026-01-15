@@ -4,6 +4,10 @@ const USAGE_COOKIE = 'meme-usage-count';
 const PREMIUM_COOKIE = 'meme-premium';
 const FREE_LIMIT = 10;
 
+function usageBypassEnabled(): boolean {
+  return process.env.DISABLE_USAGE_LIMITS === 'true';
+}
+
 export async function getUsageCount(): Promise<number> {
   const cookieStore = await cookies();
   const usage = cookieStore.get(USAGE_COOKIE);
@@ -11,6 +15,10 @@ export async function getUsageCount(): Promise<number> {
 }
 
 export async function incrementUsage(): Promise<number> {
+  if (usageBypassEnabled()) {
+    return 0;
+  }
+
   const cookieStore = await cookies();
   const current = await getUsageCount();
   const newCount = current + 1;
@@ -26,11 +34,19 @@ export async function incrementUsage(): Promise<number> {
 }
 
 export async function hasRemainingFree(): Promise<boolean> {
+  if (usageBypassEnabled()) {
+    return true;
+  }
+
   const count = await getUsageCount();
   return count < FREE_LIMIT;
 }
 
 export async function isPremium(): Promise<boolean> {
+  if (usageBypassEnabled()) {
+    return true;
+  }
+
   const cookieStore = await cookies();
   const premium = cookieStore.get(PREMIUM_COOKIE);
   return premium?.value === 'true';
@@ -55,6 +71,10 @@ export async function canGenerate(): Promise<{
   remaining: number;
   isPremium: boolean;
 }> {
+  if (usageBypassEnabled()) {
+    return { allowed: true, remaining: -1, isPremium: true };
+  }
+
   const premium = await isPremium();
   if (premium) {
     return { allowed: true, remaining: -1, isPremium: true };
@@ -71,6 +91,7 @@ export async function canGenerate(): Promise<{
 }
 
 export function getRemainingFromCookie(cookieValue: string | undefined): number {
+  if (usageBypassEnabled()) return -1;
   if (!cookieValue) return FREE_LIMIT;
   const count = parseInt(cookieValue, 10);
   return Math.max(0, FREE_LIMIT - count);

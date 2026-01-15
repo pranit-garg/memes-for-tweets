@@ -34,6 +34,11 @@ export default function Home() {
 
   // Load usage from cookie on mount
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DISABLE_USAGE_LIMITS === 'true') {
+      setUsage({ remaining: -1, isPremium: true });
+      return;
+    }
+
     const getCookie = (name: string) => {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -155,11 +160,10 @@ export default function Home() {
         {matches.length === 0 && !selectedMatch && (
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-800 mb-3">
-              Turn your tweets into memes
+              Find the perfect meme in seconds
             </h1>
             <p className="text-lg text-gray-600 max-w-xl mx-auto">
-              Paste your tweet and let AI find the perfect meme template.
-              Edit the text, download, and share.
+              Paste your tweet. Get matched to the perfect meme. Download and post.
             </p>
           </div>
         )}
@@ -232,14 +236,14 @@ export default function Home() {
         {!usage.isPremium && usage.remaining <= 0 && matches.length === 0 && (
           <div className="text-center py-8">
             <p className="text-gray-600 mb-4">
-              You&apos;ve used all your free memes. Upgrade to continue creating.
+              You&apos;ve matched 10 tweets for free. Your next viral meme is waiting.
             </p>
             <a
               href="/upgrade"
               className="inline-block py-3 px-6 bg-gradient-to-r from-purple-500 to-pink-500
                          text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
             >
-              Upgrade to Premium
+              Keep the memes coming — $5/mo
             </a>
           </div>
         )}
