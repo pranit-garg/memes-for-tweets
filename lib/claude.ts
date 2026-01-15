@@ -44,26 +44,47 @@ const FALLBACK_TEMPLATE_IDS = [
   '224015000', // Bernie Sanders Once Again Asking
 ];
 
-function getFallbackMatches(templates: MemeTemplate[], tweet: string): MemeMatch[] {
-  const fallbackTemplates = templates.filter(t =>
+function pickRandomTemplates(
+  templates: MemeTemplate[],
+  count: number,
+  excludeIds: string[] = []
+): MemeTemplate[] {
+  const excludeSet = new Set(excludeIds);
+  const eligible = templates.filter((t) => !excludeSet.has(t.id));
+  const shuffled = eligible.sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+function getFallbackMatches(
+  templates: MemeTemplate[],
+  tweet: string,
+  previousIds: string[] = []
+): MemeMatch[] {
+  const fallbackTemplates = templates.filter((t) =>
     FALLBACK_TEMPLATE_IDS.includes(t.id)
-  ).slice(0, 3);
+  );
 
-  // If we can't find our preferred fallbacks, just use the first 3 popular ones
-  const templatesToUse = fallbackTemplates.length >= 3
-    ? fallbackTemplates
-    : templates.slice(0, 3);
+  const templatesToUse =
+    fallbackTemplates.length >= 3
+      ? pickRandomTemplates(fallbackTemplates, 3, previousIds)
+      : pickRandomTemplates(templates.slice(0, 80), 3, previousIds);
 
-  return templatesToUse.map(t => {
+  return templatesToUse.map((t) => {
     const format = getMemeFormatInfo(t);
     return {
       templateId: t.id,
       templateName: t.name,
       reasoning: 'A versatile meme that works well for expressing this idea',
-      suggestedTopText: tweet.length > 50 ? tweet.substring(0, 50) + '...' : tweet,
-      suggestedBottomText: 'Me:',
+      suggestedTopText:
+        tweet.length > 50 ? tweet.substring(0, 50) + '...' : tweet,
+      suggestedBottomText: 'Me, apparently',
       textBoxes: format.textBoxes.map((box, i) => ({
-        text: i === 0 ? (tweet.length > 50 ? tweet.substring(0, 50) + '...' : tweet) : 'Me:',
+        text:
+          i === 0
+            ? tweet.length > 50
+              ? tweet.substring(0, 50) + '...'
+              : tweet
+            : 'Me, apparently',
         position: box.position,
       })),
       format: format.format,
@@ -71,13 +92,44 @@ function getFallbackMatches(templates: MemeTemplate[], tweet: string): MemeMatch
   });
 }
 
+function extractJsonArray(text: string): string | null {
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return text.slice(start, end + 1);
+}
+
+function normalizeMatch(match: MemeMatch): MemeMatch {
+  const topFromBoxes = match.textBoxes?.find((box) => box.position === 'top')?.text;
+  const bottomFromBoxes = match.textBoxes?.find((box) => box.position === 'bottom')?.text;
+
+  return {
+    ...match,
+    suggestedTopText: match.suggestedTopText || topFromBoxes || '',
+    suggestedBottomText: match.suggestedBottomText || bottomFromBoxes || '',
+    textBoxes: match.textBoxes && match.textBoxes.length > 0
+      ? match.textBoxes
+      : [
+          { position: 'top', text: match.suggestedTopText || '' },
+          { position: 'bottom', text: match.suggestedBottomText || '' },
+        ],
+  };
+}
+
 async function tryMatchWithPrompt(
   tweet: string,
   templates: MemeTemplate[],
   feedback?: string,
-  previousIds?: string[]
+  previousIds?: string[],
+  options: { maxTemplates?: number; compact?: boolean } = {}
 ): Promise<MemeMatch[] | null> {
-  const templateDescriptions = getTemplateDescriptions(templates);
+  const { maxTemplates = 150, compact = false } = options;
+  const templateDescriptions = getTemplateDescriptions(templates, {
+    maxTemplates,
+    excludeIds: previousIds,
+  });
 
   const excludeClause = previousIds?.length
     ? `\n\nIMPORTANT: Do NOT suggest these template IDs as they were already shown: ${previousIds.join(', ')}`
@@ -87,7 +139,36 @@ async function tryMatchWithPrompt(
     ? `\n\nUser feedback on previous suggestions: "${feedback}". Take this into account when selecting new memes.`
     : '';
 
-  const prompt = `You are a legendary meme lord with encyclopedic knowledge of internet culture. Your job is to create HILARIOUS, VIRAL-WORTHY meme suggestions that make people actually laugh out loud.
+  const prompt = compact
+    ? `You are a meme expert. Pick the 3 funniest meme templates for the tweet below.
+
+Tweet: "${tweet}"
+${feedbackClause}${excludeClause}
+
+Available templates:
+${templateDescriptions}
+
+Rules:
+- Prefer 2-box memes unless a multi-panel is PERFECT.
+- Avoid generic defaults (Drake, Two Buttons, Distracted Boyfriend) unless truly the best.
+- 6-8 words per text box max.
+- Transform the tweet into a clear meme joke (do not restate).
+
+Return ONLY a JSON array with exactly 3 items:
+[
+  {
+    "templateId": "ID from list above",
+    "templateName": "Meme name",
+    "reasoning": "Why it fits",
+    "format": "comparison|top-bottom|multi-panel|reaction|label",
+    "textBoxes": [
+      {"position": "top|bottom|left|right|center|panel1|panel2|etc", "text": "Short punchy text"}
+    ],
+    "suggestedTopText": "Text for top (for 2-box memes)",
+    "suggestedBottomText": "Text for bottom (for 2-box memes)"
+  }
+]`
+    : `You are a legendary meme lord with encyclopedic knowledge of internet culture. Your job is to create HILARIOUS, VIRAL-WORTHY meme suggestions that make people actually laugh out loud.
 
 ## THE TWEET TO MEME-IFY:
 "${tweet}"
@@ -99,29 +180,13 @@ ${templateDescriptions}
 ## YOUR MISSION:
 Create 3 meme suggestions that are genuinely FUNNY. Not just relevant - FUNNY. The kind of meme someone would actually share.
 
-## RULES FOR GREAT MEMES:
-
-1. **UNDERSTAND THE MEME FORMAT**: Each template has a specific joke structure. Use it correctly!
-   - Drake: Reject thing A, embrace thing B (the contrast is the joke)
-   - Distracted Boyfriend: Being tempted by something while neglecting another
-   - Change My Mind: Hot take stated confidently
-   - Two Buttons: Impossible choice between two options
-   - Expanding Brain: Escalating absurdity (normal → galaxy brain)
-
-2. **TEXT MUST BE SHORT & PUNCHY**: 
-   - Maximum 8-10 words per text box
-   - No full sentences - memes use fragments
-   - ALL CAPS works for emphasis but don't overdo it
-
-3. **THE JOKE STRUCTURE MATTERS**:
-   - Setup → Punchline (most memes)
-   - Contrast/comparison (Drake, Boyfriend, etc.)
-   - Escalation (Expanding Brain)
-   - Self-deprecating humor works great
-
-4. **DON'T JUST RESTATE THE TWEET**: Transform the tweet's idea into the meme format. The meme should AMPLIFY the humor, not just repeat it.
-
-5. **BE SPECIFIC**: Vague memes aren't funny. Specific, relatable details are.
+## QUALITY RULES:
+1. Prefer 2-box memes (top/bottom) unless a multi-panel format is PERFECT.
+2. Avoid the generic defaults (Drake, Two Buttons, Distracted Boyfriend) unless they are truly the best fit.
+3. Each pick must feel distinct — different format, different joke structure, different vibe.
+4. Text must be short and punchy (6-8 words per box max).
+5. Do NOT restate the tweet — transform it into a meme format with a clear joke.
+6. Be specific and internet-native. If you can't think of a strong angle, pick a better template.
 
 ## RESPONSE FORMAT (JSON array, no markdown):
 [
@@ -138,8 +203,6 @@ Create 3 meme suggestions that are genuinely FUNNY. Not just relevant - FUNNY. T
     "suggestedBottomText": "Text for bottom (for 2-box memes)"
   }
 ]
-
-Remember: A meme that makes someone exhale sharply through their nose > a meme that's just "relevant"
 
 Respond ONLY with the JSON array.`;
 
@@ -166,24 +229,27 @@ Respond ONLY with the JSON array.`;
       jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
     }
 
-    const rawMatches = JSON.parse(jsonText);
+    const extracted = extractJsonArray(jsonText) || jsonText;
+    const rawMatches = JSON.parse(extracted);
 
     // Enrich matches with format info and validate
-    const matches: MemeMatch[] = rawMatches.map((match: MemeMatch) => {
+    const matches: MemeMatch[] = rawMatches
+      .map((match: MemeMatch) => {
       const template = templates.find(t => t.id === match.templateId);
       if (!template) return null;
       
       const formatInfo = getMemeFormatInfo(template);
       
-      return {
+      return normalizeMatch({
         ...match,
         format: match.format || formatInfo.format,
         textBoxes: match.textBoxes || [
           { position: 'top', text: match.suggestedTopText },
           { position: 'bottom', text: match.suggestedBottomText },
         ],
-      };
-    }).filter(Boolean);
+      });
+    })
+      .filter(Boolean);
 
     if (matches.length === 0) {
       return null;
@@ -242,6 +308,22 @@ export async function matchTweetToMemes(
     };
   }
 
+  // Retry with a smaller template set + compact prompt to avoid formatting issues
+  const retryAttempt = await tryMatchWithPrompt(
+    tweet,
+    templates,
+    feedback,
+    previousIds,
+    { maxTemplates: 90, compact: true }
+  );
+
+  if (retryAttempt && retryAttempt.length >= 1) {
+    return {
+      matches: retryAttempt,
+      modified: false,
+    };
+  }
+
   // Second attempt: simplify the tweet and try again
   console.log('First attempt failed, trying with simplified tweet...');
   const simplified = await simplifyTweet(tweet);
@@ -251,7 +333,8 @@ export async function matchTweetToMemes(
       simplified.simplified,
       templates,
       feedback,
-      previousIds
+      previousIds,
+      { maxTemplates: 120 }
     );
 
     if (secondAttempt && secondAttempt.length >= 1) {
@@ -267,7 +350,7 @@ export async function matchTweetToMemes(
   // Final fallback: return popular versatile memes
   console.log('All attempts failed, using fallback memes...');
   return {
-    matches: getFallbackMatches(templates, tweet),
+    matches: getFallbackMatches(templates, tweet, previousIds),
     modified: true,
     message: "We couldn't find a perfect match, so here are some versatile memes that might work. Try the feedback button for different options!",
   };

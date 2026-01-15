@@ -445,12 +445,50 @@ export function getMemeFormatInfo(template: MemeTemplate): MemeFormatInfo {
 }
 
 // Get rich template descriptions for LLM matching
-export function getTemplateDescriptions(templates: MemeTemplate[]): string {
-  return templates
-    .slice(0, 50) // Limit to top 50 for LLM context
+function shuffleArray<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+interface TemplateDescriptionOptions {
+  maxTemplates?: number;
+  excludeIds?: string[];
+}
+
+export function getTemplateDescriptions(
+  templates: MemeTemplate[],
+  options: TemplateDescriptionOptions = {}
+): string {
+  const { maxTemplates = 140, excludeIds = [] } = options;
+  const excludeSet = new Set(excludeIds);
+
+  const curatedIds = new Set(Object.keys(MEME_FORMAT_DATABASE));
+  const curatedTemplates = templates.filter(
+    (t) => curatedIds.has(t.id) && !excludeSet.has(t.id)
+  );
+
+  const remainingTemplates = templates.filter(
+    (t) => !curatedIds.has(t.id) && !excludeSet.has(t.id)
+  );
+
+  // Use a mix of top templates + random sample for diversity
+  const topSlice = remainingTemplates.slice(0, 120);
+  const randomSlice = shuffleArray(remainingTemplates.slice(120)).slice(0, 60);
+
+  const combined = [
+    ...curatedTemplates,
+    ...topSlice,
+    ...randomSlice,
+  ].slice(0, maxTemplates);
+
+  return combined
     .map((t) => {
       const format = getMemeFormatInfo(t);
-      const boxInfo = format.textBoxes.map(b => `${b.position}: ${b.purpose}`).join('; ');
+      const boxInfo = format.textBoxes.map((b) => `${b.position}: ${b.purpose}`).join('; ');
       return `ID: ${t.id} - "${t.name}" (${format.format}, ${t.box_count} text boxes)
   Best for: ${format.bestFor}
   Description: ${format.description}
