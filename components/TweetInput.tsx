@@ -25,60 +25,73 @@ export default function TweetInput({
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-      <div className="relative">
-        <textarea
-          value={tweet}
-          onChange={(e) => setTweet(e.target.value)}
-          placeholder="What's your tweet about?"
-          maxLength={maxLength}
-          disabled={disabled}
-          className="w-full h-32 p-4 text-lg text-black border-2 border-gray-200 rounded-xl
-                     focus:border-blue-500 focus:ring-2 focus:ring-blue-200
-                     outline-none resize-none transition-all
-                     disabled:bg-gray-100 disabled:cursor-not-allowed
-                     placeholder:text-gray-400"
-        />
-        <div className="absolute bottom-3 right-3 text-sm text-gray-400">
-          {tweet.length}/{maxLength}
+      {/* Rage box container */}
+      <div className="rage-box p-1 bg-white">
+        <div className="relative">
+          {/* Label bar */}
+          <div className="bg-gradient-to-r from-[#1E90FF] to-[#00CED1] px-3 py-2 border-b-4 border-black">
+            <span className="impact-text text-white text-sm tracking-wide drop-shadow-md">
+              📝 ENTER UR TWEET HERE 📝
+            </span>
+          </div>
+          
+          <textarea
+            value={tweet}
+            onChange={(e) => setTweet(e.target.value)}
+            placeholder="paste ur tweet here lol..."
+            maxLength={maxLength}
+            disabled={disabled}
+            className="w-full h-32 p-4 text-lg text-black bg-white
+                       border-0 outline-none resize-none
+                       disabled:bg-gray-200 disabled:cursor-not-allowed
+                       placeholder:text-gray-400 placeholder:italic
+                       focus:bg-[#FFFACD]
+                       transition-colors"
+            style={{ fontFamily: "'Comic Sans MS', 'Comic Neue', cursive" }}
+          />
+          
+          {/* Character counter - old school style */}
+          <div className="absolute bottom-2 right-3 px-2 py-1 bg-black text-[#00FF00] text-xs font-mono">
+            {tweet.length}/{maxLength}
+          </div>
         </div>
       </div>
 
+      {/* Big chunky submit button */}
       <button
         type="submit"
         disabled={!tweet.trim() || isLoading || disabled}
-        className="mt-4 w-full py-3 px-6 bg-blue-600 text-white font-semibold
-                   rounded-xl hover:bg-blue-700 transition-colors
-                   disabled:bg-gray-300 disabled:cursor-not-allowed
-                   flex items-center justify-center gap-2"
+        className={`mt-4 w-full py-4 px-6 
+                   impact-text text-xl tracking-wider
+                   border-4 border-black
+                   transition-all
+                   ${!tweet.trim() || isLoading || disabled 
+                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                     : 'bg-gradient-to-r from-[#FF4444] via-[#FF8C00] to-[#FFD700] text-white glossy-btn cursor-pointer'
+                   }
+                   flex items-center justify-center gap-3`}
       >
         {isLoading ? (
           <>
-            <svg
-              className="animate-spin h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            Matching your vibe...
+            <div className="relative w-6 h-6">
+              <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+            <span>FINDING EPIC MEMES...</span>
+            <span className="animate-pulse">🔍</span>
           </>
         ) : (
-          'Match My Tweet'
+          <>
+            <span>🎯</span>
+            <span>MATCH MY TWEET</span>
+            <span>🎯</span>
+          </>
         )}
       </button>
+
+      {/* Subtext */}
+      <p className="text-center mt-3 text-sm text-white/70">
+        ↑ click da button 4 epic memes ↑
+      </p>
     </form>
   );
 }

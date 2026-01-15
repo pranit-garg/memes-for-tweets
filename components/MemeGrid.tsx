@@ -145,7 +145,7 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
   }, [match]);
 
   return (
-    <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-gray-100">
+    <div className="relative w-full aspect-square overflow-hidden bg-gray-100">
       <canvas
         ref={canvasRef}
         className={`w-full h-full object-contain transition-opacity duration-200 ${
@@ -154,7 +154,7 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       />
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
         </div>
       )}
     </div>
@@ -172,30 +172,35 @@ export default function MemeGrid({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-        Pick a meme
-      </h2>
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h2 className="impact-text text-3xl text-[#FFD700] meme-shadow">
+          🎉 PICK UR MEME 🎉
+        </h2>
+        <p className="text-white/70 text-sm mt-1">click one 2 customize it</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {matches.map((match) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {matches.map((match, index) => (
           <button
             key={match.templateId}
             onClick={() => onSelect(match)}
-            className={`p-4 rounded-xl border-2 transition-all hover:shadow-lg hover:scale-[1.02]
-                       ${
-                         selectedId === match.templateId
-                           ? 'border-blue-500 bg-blue-50 shadow-lg'
-                           : 'border-gray-200 hover:border-blue-300'
-                       }`}
+            className={`rage-box card-hover p-0 overflow-hidden
+                       ${selectedId === match.templateId ? 'ring-4 ring-[#FFD700]' : ''}`}
           >
+            {/* Number badge */}
+            <div className="absolute top-2 left-2 z-10 w-8 h-8 bg-[#FF4444] border-2 border-black flex items-center justify-center">
+              <span className="impact-text text-white text-lg">{index + 1}</span>
+            </div>
+            
             <MemePreview match={match} />
 
-            <div className="mt-3 space-y-1">
-              <h3 className="font-semibold text-gray-800 text-sm truncate">
+            {/* Info bar */}
+            <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] p-3 border-t-4 border-black">
+              <h3 className="font-bold text-[#FFD700] text-sm truncate mb-1">
                 {match.templateName}
               </h3>
-
-              <p className="text-xs text-gray-500 line-clamp-2">
+              <p className="text-xs text-white/60 line-clamp-2">
                 {match.reasoning}
               </p>
             </div>

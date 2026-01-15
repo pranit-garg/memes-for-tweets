@@ -122,7 +122,6 @@ export default function Home() {
   };
 
   const handleDownload = () => {
-    // Could track downloads here
     console.log('Meme downloaded');
   };
 
@@ -140,31 +139,57 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
-      <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen relative z-10">
+      {/* Header - Early web forum style */}
+      <header className="border-b-4 border-black bg-gradient-to-r from-[#FFD700] via-[#FF8C00] to-[#FF4444] sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={handleStartOver}
-            className="text-xl font-bold text-gray-800 hover:text-blue-600 transition-colors"
+            className="flex items-center gap-2 group"
           >
-            Memes for Tweets
+            <span className="text-3xl">🔥</span>
+            <span className="impact-text text-2xl text-black meme-shadow drop-shadow-lg">
+              Memes 4 Tweets
+            </span>
+            <span className="text-3xl">🔥</span>
           </button>
           <UsageCounter remaining={usage.remaining} isPremium={usage.isPremium} />
         </div>
       </header>
 
+      {/* Marquee banner - peak 2008 */}
+      <div className="bg-black text-[#00FF00] py-1 overflow-hidden border-b-2 border-[#00FF00]">
+        <div className="scroll-text whitespace-nowrap font-bold">
+          ⭐ WELCOME TO THE MEME ZONE ⭐ 100+ EPIC TEMPLATES ⭐ MAKE YOUR TWEETS GO VIRAL ⭐ NO DOWNLOAD REQUIRED ⭐ FREE TO USE ⭐ MUCH WOW ⭐ VERY MEME ⭐ SO DANK ⭐
+        </div>
+      </div>
+
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-4 py-8">
         {/* Hero section - only show when no matches */}
         {matches.length === 0 && !selectedMatch && (
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-3">
-              Find the perfect meme in seconds
+            {/* Retro badge */}
+            <div className="inline-block mb-4 px-4 py-2 bg-[#FF4444] border-4 border-black transform -rotate-2">
+              <span className="impact-text text-white text-sm tracking-wider">★ NOW WITH AI POWER ★</span>
+            </div>
+            
+            <h1 className="impact-text text-5xl md:text-6xl text-[#FFD700] meme-shadow mb-4 leading-tight">
+              FIND THE PERFECT<br />
+              <span className="rainbow-text">MEME</span> IN SECONDS
             </h1>
-            <p className="text-lg text-gray-600 max-w-xl mx-auto">
-              Paste your tweet. Get matched to the perfect meme. Download and post.
+            
+            <p className="text-xl text-white/90 max-w-xl mx-auto mb-2">
+              Paste ur tweet. Get matched to epic memes. Download. Post. Profit???
             </p>
+            
+            <div className="flex justify-center gap-4 text-3xl my-4">
+              <span className="animate-bounce" style={{ animationDelay: '0s' }}>😂</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>🤣</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>💀</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.3s' }}>🔥</span>
+              <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>👌</span>
+            </div>
           </div>
         )}
 
@@ -181,27 +206,19 @@ export default function Home() {
 
         {/* Error message */}
         {error && (
-          <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-center">
+          <div className="max-w-2xl mx-auto mb-6 rage-box p-4 text-red-600 text-center">
+            <span className="text-2xl mr-2">❌</span>
             {error}
+            <span className="text-2xl ml-2">❌</span>
           </div>
         )}
 
         {/* Info message (when tweet was modified) */}
         {infoMessage && !selectedMatch && (
-          <div className="max-w-2xl mx-auto mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl">
-            <div className="flex items-start gap-3">
-              <svg
-                className="w-5 h-5 mt-0.5 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <p className="text-sm">{infoMessage}</p>
+          <div className="max-w-2xl mx-auto mb-6 rage-box p-4 bg-[#FFFACD]">
+            <div className="flex items-center gap-3 text-black">
+              <span className="text-2xl">⚠️</span>
+              <p className="font-bold">{infoMessage}</p>
             </div>
           </div>
         )}
@@ -235,19 +252,45 @@ export default function Home() {
         {/* Paywall reached message */}
         {!usage.isPremium && usage.remaining <= 0 && matches.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-gray-600 mb-4">
-              You&apos;ve matched 10 tweets for free. Your next viral meme is waiting.
-            </p>
-            <a
-              href="/upgrade"
-              className="inline-block py-3 px-6 bg-gradient-to-r from-purple-500 to-pink-500
-                         text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
-            >
-              Keep the memes coming — $5/mo
-            </a>
+            <div className="rage-box inline-block p-6 bg-white">
+              <p className="text-black text-lg mb-4 font-bold">
+                😱 U USED ALL UR FREE MEMES 😱
+              </p>
+              <p className="text-gray-700 mb-4">
+                Your next viral meme is waiting...
+              </p>
+              <a
+                href="/upgrade"
+                className="inline-block py-3 px-6 bg-gradient-to-r from-[#9932CC] to-[#FF69B4]
+                           text-white font-bold rounded-none border-4 border-black
+                           glossy-btn impact-text tracking-wide"
+              >
+                🌟 UNLOCK UNLIMITED 🌟
+              </a>
+            </div>
           </div>
         )}
       </main>
+
+      {/* Footer - visitor counter vibes */}
+      <footer className="border-t-4 border-black bg-gradient-to-r from-[#1a1a2e] to-[#16213e] py-4 mt-8">
+        <div className="max-w-5xl mx-auto px-4 text-center">
+          <p className="text-[#00FF00] text-sm mb-2">
+            🌐 You are visitor #
+            <span className="font-bold text-[#FFD700]">
+              {Math.floor(Math.random() * 900000 + 100000).toLocaleString()}
+            </span>
+            🌐
+          </p>
+          <p className="text-gray-400 text-xs">
+            Made with 💖 and rage comics energy © 2024
+          </p>
+          <div className="mt-2 flex justify-center gap-2">
+            <span className="px-2 py-1 bg-[#FF4444] text-white text-xs border border-black">BEST VIEWED IN NETSCAPE</span>
+            <span className="px-2 py-1 bg-[#1E90FF] text-white text-xs border border-black">OPTIMIZED FOR 800x600</span>
+          </div>
+        </div>
+      </footer>
 
       {/* Upgrade modal */}
       <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} />

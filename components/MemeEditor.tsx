@@ -107,6 +107,7 @@ export default function MemeEditor({
   const [bottomText, setBottomText] = useState(initialBottomText);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   
   // Text customization settings - default to smaller text that doesn't cover image
   const [topSettings, setTopSettings] = useState<TextSettings>({
@@ -216,6 +217,8 @@ export default function MemeEditor({
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob }),
         ]);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
       }
     } catch (error) {
       console.error('Copy error:', error);
@@ -224,7 +227,7 @@ export default function MemeEditor({
 
   const handleShareToTwitter = () => {
     const tweetText = encodeURIComponent(
-      `Made this meme in 10 seconds\n\nmemes-for-tweets.vercel.app`
+      `Made this meme in 10 seconds 🔥\n\nmemes-for-tweets.vercel.app`
     );
     const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
     window.open(twitterUrl, '_blank', 'noopener,noreferrer');
@@ -232,230 +235,203 @@ export default function MemeEditor({
 
   return (
     <div className="w-full max-w-2xl mx-auto">
+      {/* Back button */}
       <button
         onClick={onBack}
-        className="mb-4 text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium"
+        className="mb-4 text-[#FFD700] hover:text-white flex items-center gap-2 font-bold transition-colors"
       >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-        Back to memes
+        <span className="text-xl">←</span>
+        <span>BACK 2 MEMES</span>
       </button>
 
-      <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-        <h2 className="text-xl font-bold text-gray-800 mb-1 text-center">
-          Edit your meme
-        </h2>
-        <p className="text-sm text-gray-500 mb-5 text-center">
-          {match.templateName}
-        </p>
+      {/* Main editor box */}
+      <div className="rage-box bg-white p-0 overflow-hidden">
+        {/* Header bar */}
+        <div className="bg-gradient-to-r from-[#9932CC] to-[#FF69B4] px-4 py-3 border-b-4 border-black">
+          <h2 className="impact-text text-white text-xl tracking-wide text-center drop-shadow-md">
+            ✏️ EDIT UR MEME ✏️
+          </h2>
+          <p className="text-white/80 text-sm text-center">
+            {match.templateName}
+          </p>
+        </div>
 
         {/* Preview */}
-        <div className="flex justify-center mb-6">
-          <canvas
-            ref={canvasRef}
-            className="max-w-full rounded-xl shadow-lg border border-gray-200"
-          />
+        <div className="p-4 bg-[#f0f0f0] border-b-4 border-black">
+          <div className="flex justify-center">
+            <canvas
+              ref={canvasRef}
+              className="max-w-full border-4 border-black shadow-lg"
+            />
+          </div>
         </div>
 
         {/* Text inputs */}
-        <div className="space-y-4 mb-4">
+        <div className="p-4 space-y-4 bg-white">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Top Text
+            <label className="block text-sm font-bold text-black mb-2 uppercase">
+              📝 Top Text
             </label>
             <input
               type="text"
               value={topText}
               onChange={(e) => setTopText(e.target.value)}
               placeholder="Enter top text..."
-              className="w-full p-3 text-black border border-gray-200 rounded-xl
-                       focus:border-blue-500 focus:ring-2 focus:ring-blue-100
-                       outline-none transition-all placeholder:text-gray-400
-                       font-medium"
+              className="w-full p-3 text-black bg-[#FFFACD] border-4 border-black
+                       focus:bg-white focus:ring-2 focus:ring-[#FFD700]
+                       outline-none transition-all placeholder:text-gray-400"
+              style={{ fontFamily: "'Comic Sans MS', 'Comic Neue', cursive" }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Bottom Text
+            <label className="block text-sm font-bold text-black mb-2 uppercase">
+              📝 Bottom Text
             </label>
             <input
               type="text"
               value={bottomText}
               onChange={(e) => setBottomText(e.target.value)}
               placeholder="Enter bottom text..."
-              className="w-full p-3 text-black border border-gray-200 rounded-xl
-                       focus:border-blue-500 focus:ring-2 focus:ring-blue-100
-                       outline-none transition-all placeholder:text-gray-400
-                       font-medium"
+              className="w-full p-3 text-black bg-[#FFFACD] border-4 border-black
+                       focus:bg-white focus:ring-2 focus:ring-[#FFD700]
+                       outline-none transition-all placeholder:text-gray-400"
+              style={{ fontFamily: "'Comic Sans MS', 'Comic Neue', cursive" }}
             />
           </div>
+
+          {/* Advanced controls toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full py-2 text-sm text-gray-600 hover:text-black 
+                       flex items-center justify-center gap-2 transition-colors border-2 border-dashed border-gray-300"
+          >
+            <span className={`transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>▶</span>
+            {showAdvanced ? 'Hide' : 'Show'} text controls
+          </button>
+
+          {/* Advanced controls */}
+          {showAdvanced && (
+            <div className="p-4 bg-[#f0f0f0] border-4 border-black space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-sm font-bold text-black">TOP SIZE</label>
+                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{topSettings.fontSize}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="20"
+                  max="100"
+                  value={topSettings.fontSize}
+                  onChange={(e) => setTopSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
+                />
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-sm font-bold text-black">TOP POSITION</label>
+                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{topSettings.yOffset === 0 ? 'EDGE' : `+${topSettings.yOffset}%`}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  value={topSettings.yOffset}
+                  onChange={(e) => setTopSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
+                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
+                />
+              </div>
+
+              <hr className="border-2 border-black" />
+
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-sm font-bold text-black">BOTTOM SIZE</label>
+                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{bottomSettings.fontSize}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="20"
+                  max="100"
+                  value={bottomSettings.fontSize}
+                  onChange={(e) => setBottomSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
+                />
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-sm font-bold text-black">BOTTOM POSITION</label>
+                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{bottomSettings.yOffset === 0 ? 'EDGE' : `+${bottomSettings.yOffset}%`}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  value={bottomSettings.yOffset}
+                  onChange={(e) => setBottomSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
+                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Advanced controls toggle */}
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full mb-4 py-2 text-sm text-gray-600 hover:text-gray-800 
-                     flex items-center justify-center gap-1 transition-colors"
-        >
-          <svg
-            className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          {showAdvanced ? 'Hide' : 'Show'} text controls
-        </button>
-
-        {/* Advanced controls */}
-        {showAdvanced && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-medium text-gray-700">Top Text Size</label>
-                <span className="text-xs text-gray-500">{topSettings.fontSize}%</span>
-              </div>
-              <input
-                type="range"
-                min="20"
-                max="100"
-                value={topSettings.fontSize}
-                onChange={(e) => setTopSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-medium text-gray-700">Top Text Position</label>
-                <span className="text-xs text-gray-500">{topSettings.yOffset === 0 ? 'Edge' : `+${topSettings.yOffset}%`}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="50"
-                value={topSettings.yOffset}
-                onChange={(e) => setTopSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-            </div>
-
-            <hr className="border-gray-200" />
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-medium text-gray-700">Bottom Text Size</label>
-                <span className="text-xs text-gray-500">{bottomSettings.fontSize}%</span>
-              </div>
-              <input
-                type="range"
-                min="20"
-                max="100"
-                value={bottomSettings.fontSize}
-                onChange={(e) => setBottomSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-medium text-gray-700">Bottom Text Position</label>
-                <span className="text-xs text-gray-500">{bottomSettings.yOffset === 0 ? 'Edge' : `+${bottomSettings.yOffset}%`}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="50"
-                value={bottomSettings.yOffset}
-                onChange={(e) => setBottomSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-3 mb-3">
-          <button
-            onClick={handleCopyToClipboard}
-            className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 font-semibold
-                       rounded-xl hover:bg-gray-200 transition-colors
-                       flex items-center justify-center gap-2"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {/* Action buttons */}
+        <div className="p-4 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] border-t-4 border-black space-y-3">
+          <div className="flex gap-3">
+            <button
+              onClick={handleCopyToClipboard}
+              className="flex-1 py-3 px-4 bg-[#1E90FF] text-white font-bold
+                         border-4 border-black glossy-btn
+                         flex items-center justify-center gap-2 uppercase"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            Copy
-          </button>
+              {copySuccess ? (
+                <>
+                  <span>✓</span>
+                  <span>COPIED!</span>
+                </>
+              ) : (
+                <>
+                  <span>📋</span>
+                  <span>COPY</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="flex-1 py-3 px-4 bg-[#00FF00] text-black font-bold
+                         border-4 border-black glossy-btn
+                         disabled:bg-gray-400 disabled:cursor-not-allowed
+                         flex items-center justify-center gap-2 uppercase"
+            >
+              {isDownloading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  <span>SAVING...</span>
+                </>
+              ) : (
+                <>
+                  <span>💾</span>
+                  <span>DOWNLOAD</span>
+                </>
+              )}
+            </button>
+          </div>
 
           <button
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className="flex-1 py-3 px-6 bg-gradient-to-r from-green-500 to-emerald-600
-                       text-white font-semibold rounded-xl
-                       hover:from-green-600 hover:to-emerald-700 transition-all
-                       disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed
-                       flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+            onClick={handleShareToTwitter}
+            className="w-full py-3 px-4 bg-black text-white font-bold
+                       border-4 border-[#1DA1F2] hover:bg-[#1DA1F2] transition-colors
+                       flex items-center justify-center gap-2 uppercase"
           >
-            {isDownloading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                Download
-              </>
-            )}
+            <span>🐦</span>
+            <span>SHARE 2 TWITTER</span>
           </button>
         </div>
-
-        <button
-          onClick={handleShareToTwitter}
-          className="w-full py-3 px-6 bg-black text-white font-semibold
-                     rounded-xl hover:bg-gray-800 transition-colors
-                     flex items-center justify-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-          </svg>
-          Share to X
-        </button>
       </div>
     </div>
   );
