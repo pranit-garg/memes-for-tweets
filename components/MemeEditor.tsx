@@ -15,30 +15,9 @@ interface MemeEditorProps {
   onBack: () => void;
 }
 
-// Dynamically calculate optimal font size to fit text
-function calculateOptimalFontSize(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  maxHeight: number,
-  minSize: number,
-  maxSize: number
-): { fontSize: number; lines: string[] } {
-  let fontSize = maxSize;
-  let lines: string[] = [];
-
-  while (fontSize >= minSize) {
-    ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
-    lines = wrapText(ctx, text, maxWidth);
-    const totalHeight = lines.length * fontSize * 1.15;
-
-    if (totalHeight <= maxHeight && lines.every(line => ctx.measureText(line).width <= maxWidth)) {
-      break;
-    }
-    fontSize -= 2;
-  }
-
-  return { fontSize: Math.max(fontSize, minSize), lines };
+interface TextSettings {
+  fontSize: number;
+  yOffset: number; // 0-100, where 0 is at edge, 100 is toward center
 }
 
 // Wrap text to fit within maxWidth
@@ -70,53 +49,46 @@ function wrapText(
   return lines;
 }
 
-// Draw meme-style text with thick outline and shadow
+// Draw meme-style text with thick outline
 function drawMemeText(
   ctx: CanvasRenderingContext2D,
-  lines: string[],
+  text: string,
   x: number,
-  startY: number,
+  y: number,
   fontSize: number,
+  maxWidth: number,
   isBottom: boolean
 ) {
-  const lineHeight = fontSize * 1.15;
+  ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = isBottom ? 'bottom' : 'top';
   
-  // Calculate actual starting Y for bottom text (work upward)
-  const actualStartY = isBottom
-    ? startY - (lines.length - 1) * lineHeight
-    : startY;
+  const lines = wrapText(ctx, text.toUpperCase(), maxWidth);
+  const lineHeight = fontSize * 1.1;
+  
+  // Calculate starting Y
+  let startY = y;
+  if (isBottom) {
+    // For bottom text, we start from y and go up
+    startY = y - (lines.length - 1) * lineHeight;
+  }
 
   lines.forEach((line, index) => {
-    const y = actualStartY + index * lineHeight;
-    const text = line.toUpperCase();
-
-    // Add subtle shadow for depth
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-
-    // Draw thick black outline
+    const lineY = startY + index * lineHeight;
+    
+    // Draw black outline (multiple passes for thickness)
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = fontSize * 0.12;
+    ctx.lineWidth = fontSize * 0.15;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.miterLimit = 2;
-
-    // Draw stroke multiple times for extra thickness
-    for (let i = 0; i < 3; i++) {
-      ctx.strokeText(text, x, y);
+    
+    for (let i = 0; i < 4; i++) {
+      ctx.strokeText(line, x, lineY);
     }
-
-    // Reset shadow for fill
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
 
     // Draw white fill
     ctx.fillStyle = 'white';
-    ctx.fillText(text, x, y);
+    ctx.fillText(line, x, lineY);
   });
 }
 
@@ -134,7 +106,18 @@ export default function MemeEditor({
   const [topText, setTopText] = useState(initialTopText);
   const [bottomText, setBottomText] = useState(initialBottomText);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [textBoxes, setTextBoxes] = useState<TextBox[]>(
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  
+  // Text customization settings
+  const [topSettings, setTopSettings] = useState<TextSettings>({
+    fontSize: 50, // percentage of auto-calculated size
+    yOffset: 0,   // 0 = at edge, higher = more toward center
+  });
+  const [bottomSettings, setBottomSettings] = useState<TextSettings>({
+    fontSize: 50,
+    yOffset: 0,
+  });
+  const [, setTextBoxes] = useState<TextBox[]>(
     match.textBoxes || [
       { position: 'top', text: initialTopText },
       { position: 'bottom', text: initialBottomText },
@@ -171,44 +154,28 @@ export default function MemeEditor({
       // Draw image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Text rendering settings
-      ctx.textAlign = 'center';
-      
-      const padding = canvas.width * 0.04;
+      // Calculate text sizing based on image dimensions
+      const baseFontSize = Math.min(canvas.width / 10, canvas.height / 12);
+      const padding = canvas.width * 0.03;
       const maxTextWidth = canvas.width - padding * 2;
-      
-      // Calculate available height for each text area (top 25%, bottom 25%)
-      const textAreaHeight = canvas.height * 0.22;
-      const minFontSize = Math.max(16, canvas.width / 25);
-      const maxFontSize = Math.max(28, canvas.width / 8);
 
-      // Draw top text
+      // Draw top text - positioned at the VERY TOP
       if (topText.trim()) {
-        ctx.textBaseline = 'top';
-        const { fontSize, lines } = calculateOptimalFontSize(
-          ctx, topText, maxTextWidth, textAreaHeight, minFontSize, maxFontSize
-        );
-        ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
-        
-        const topY = padding + fontSize * 0.1;
-        drawMemeText(ctx, lines, canvas.width / 2, topY, fontSize, false);
+        const fontSize = baseFontSize * (topSettings.fontSize / 50);
+        const yPos = padding + (topSettings.yOffset / 100) * (canvas.height * 0.15);
+        drawMemeText(ctx, topText, canvas.width / 2, yPos, fontSize, maxTextWidth, false);
       }
 
-      // Draw bottom text
+      // Draw bottom text - positioned at the VERY BOTTOM
       if (bottomText.trim()) {
-        ctx.textBaseline = 'bottom';
-        const { fontSize, lines } = calculateOptimalFontSize(
-          ctx, bottomText, maxTextWidth, textAreaHeight, minFontSize, maxFontSize
-        );
-        ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
-        
-        const bottomY = canvas.height - padding - fontSize * 0.1;
-        drawMemeText(ctx, lines, canvas.width / 2, bottomY, fontSize, true);
+        const fontSize = baseFontSize * (bottomSettings.fontSize / 50);
+        const yPos = canvas.height - padding - (bottomSettings.yOffset / 100) * (canvas.height * 0.15);
+        drawMemeText(ctx, bottomText, canvas.width / 2, yPos, fontSize, maxTextWidth, true);
       }
     };
 
     img.src = match.templateUrl;
-  }, [match.templateUrl, topText, bottomText]);
+  }, [match.templateUrl, topText, bottomText, topSettings, bottomSettings]);
 
   useEffect(() => {
     renderMeme();
@@ -290,7 +257,7 @@ export default function MemeEditor({
           {match.templateName}
         </p>
 
-        {/* Preview first, inputs below */}
+        {/* Preview */}
         <div className="flex justify-center mb-6">
           <canvas
             ref={canvasRef}
@@ -298,7 +265,8 @@ export default function MemeEditor({
           />
         </div>
 
-        <div className="space-y-4 mb-6">
+        {/* Text inputs */}
+        <div className="space-y-4 mb-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
               Top Text
@@ -331,6 +299,90 @@ export default function MemeEditor({
             />
           </div>
         </div>
+
+        {/* Advanced controls toggle */}
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full mb-4 py-2 text-sm text-gray-600 hover:text-gray-800 
+                     flex items-center justify-center gap-1 transition-colors"
+        >
+          <svg
+            className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          {showAdvanced ? 'Hide' : 'Show'} text controls
+        </button>
+
+        {/* Advanced controls */}
+        {showAdvanced && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-xl space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium text-gray-700">Top Text Size</label>
+                <span className="text-xs text-gray-500">{topSettings.fontSize}%</span>
+              </div>
+              <input
+                type="range"
+                min="20"
+                max="100"
+                value={topSettings.fontSize}
+                onChange={(e) => setTopSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
+            
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium text-gray-700">Top Text Position</label>
+                <span className="text-xs text-gray-500">{topSettings.yOffset === 0 ? 'Edge' : `+${topSettings.yOffset}%`}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="50"
+                value={topSettings.yOffset}
+                onChange={(e) => setTopSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
+
+            <hr className="border-gray-200" />
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium text-gray-700">Bottom Text Size</label>
+                <span className="text-xs text-gray-500">{bottomSettings.fontSize}%</span>
+              </div>
+              <input
+                type="range"
+                min="20"
+                max="100"
+                value={bottomSettings.fontSize}
+                onChange={(e) => setBottomSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
+            
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium text-gray-700">Bottom Text Position</label>
+                <span className="text-xs text-gray-500">{bottomSettings.yOffset === 0 ? 'Edge' : `+${bottomSettings.yOffset}%`}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="50"
+                value={bottomSettings.yOffset}
+                onChange={(e) => setBottomSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 mb-3">
           <button

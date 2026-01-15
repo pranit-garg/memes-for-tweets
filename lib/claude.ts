@@ -120,51 +120,61 @@ async function generateMemeMatches(
     ? `\nDO NOT USE these template IDs (already shown): ${excludeIds.join(', ')}\n`
     : '';
 
-  const prompt = `You are a meme expert. Your job: turn this tweet into 3 hilarious memes.
+  const prompt = `You are an elite meme creator who understands EXACTLY how each meme format works.
 
-TWEET:
+TWEET TO MEME:
 "${tweet}"
 ${feedbackLine}${excludeLine}
-AVAILABLE TEMPLATES:
+## STEP 1: ANALYZE THE TWEET
+First, identify what type of content this is:
+- Is it a HOT TAKE or opinion? (good for: Change My Mind, Sign memes)
+- Is it IRONIC/SARCASTIC observation? (good for: This Is Fine, Bike Fall, Galaxy Brain)
+- Is it a COMPARISON between two things? (good for: Drake, Tuxedo Pooh - ONLY if comparing)
+- Is it a PREDICTABLE OUTCOME? (good for: Surprised Pikachu - "did X, got X result, shocked")
+- Is it SELF-DEPRECATION? (good for: Clown applying makeup, Bike Fall)
+- Is it a FRUSTRATION or complaint? (good for: Batman Slap, Angry Lady Cat)
+
+## STEP 2: FORMAT MATCHING RULES (CRITICAL!)
+ONLY use a format if the tweet ACTUALLY fits its structure:
+
+• Drake/Tuxedo Pooh: ONLY for "I prefer B over A" tweets. The tweet MUST have two alternatives.
+  ❌ BAD: "Grok is bad" → Drake doesn't work because there's no preference choice
+  ✓ GOOD: "Reading docs vs asking ChatGPT" → Drake works because it's comparing two options
+
+• Surprised Pikachu: ONLY for "obvious cause → obvious effect → surprise" 
+  ❌ BAD: Generic "X happens" → "reaction"  
+  ✓ GOOD: "Train AI on garbage → AI outputs garbage → *shocked*"
+
+• Bike Fall: Perfect for "X causes Y but they blame Z" or self-sabotage
+  ✓ GOOD: "Grok trains on Twitter brainrot → produces brainrot → X is confused"
+
+• This Is Fine: For ignoring obvious problems or chaos
+• Change My Mind: For controversial opinions stated as facts
+• Always Has Been: For "wait, X was always Y?" revelations
+• Expanding Brain: For increasingly absurd takes on one topic
+• Distracted Boyfriend: ONLY when there's literally "thing I should want" vs "temptation"
+
+## STEP 3: CAPTION RULES
+- MAX 6-8 words per text box
+- NO generic phrases like "Me:", "When you...", "POV:", "Nobody:"
+- Transform the tweet's IDEA, don't just copy its words
+- The caption should work even without seeing the original tweet
+
+## AVAILABLE TEMPLATES:
 ${templateContext}
 
-YOUR TASK:
-1. Understand what the tweet is REALLY saying (the joke, the frustration, the insight)
-2. Pick 3 DIFFERENT templates that fit the tweet's vibe
-3. Write SHORT, PUNCHY captions (5-8 words max per line)
-4. Make it FUNNY - transform the tweet, don't just restate it
-
-CRITICAL RULES:
-- Each meme must use a DIFFERENT template
-- Captions must be SHORT (under 8 words each)
-- The text must match how the meme format works (e.g., Drake = reject top, approve bottom)
-- NO generic text like "Me:" or "When you..." - be specific to the tweet
-- Make people actually want to share these memes
-
-RESPONSE FORMAT (JSON array only, no other text):
+## OUTPUT FORMAT (JSON array, no markdown):
 [
   {
     "templateId": "exact ID from list",
-    "templateName": "template name",
-    "reasoning": "one sentence why this format fits",
-    "suggestedTopText": "short top text",
-    "suggestedBottomText": "short bottom text"
-  },
-  {
-    "templateId": "different ID",
-    "templateName": "template name",
-    "reasoning": "one sentence why",
-    "suggestedTopText": "top text",
-    "suggestedBottomText": "bottom text"
-  },
-  {
-    "templateId": "third different ID",
-    "templateName": "template name",
-    "reasoning": "one sentence why",
-    "suggestedTopText": "top text",
-    "suggestedBottomText": "bottom text"
+    "templateName": "template name", 
+    "reasoning": "Specific reason why this format's structure matches the tweet's structure",
+    "suggestedTopText": "short punchy text",
+    "suggestedBottomText": "short punchy text"
   }
-]`;
+]
+
+Return exactly 3 memes that ACTUALLY fit their format. Quality over forcing a format.`;
 
   try {
     console.log('=== generateMemeMatches START ===');

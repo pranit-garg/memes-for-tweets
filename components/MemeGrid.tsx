@@ -50,15 +50,15 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       // Draw image centered
       ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
 
-      // Configure text style - classic meme font
-      const fontSize = Math.max(14, Math.min(20, size / 15));
+      // Configure text style - smaller font for thumbnails to not obscure image
+      const fontSize = Math.max(12, Math.min(16, size / 20));
       ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
       ctx.textAlign = 'center';
 
-      const padding = 8;
-      const maxTextWidth = scaledWidth - padding * 2;
+      const padding = 4;
+      const maxTextWidth = size - padding * 2;
 
-      // Helper to wrap text
+      // Helper to wrap text - more aggressive for thumbnails
       const wrapText = (text: string, maxWidth: number): string[] => {
         const words = text.split(' ');
         const lines: string[] = [];
@@ -83,26 +83,28 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
         return lines.slice(0, 2); // Max 2 lines for preview
       };
 
-      // Helper to draw meme text with outline
-      const drawMemeText = (text: string, x: number, y: number, isTop: boolean) => {
+      // Helper to draw meme text with outline at the VERY edges
+      const drawMemeText = (text: string, y: number, isTop: boolean) => {
         const lines = wrapText(text.toUpperCase(), maxTextWidth);
-        const lineHeight = fontSize * 1.2;
+        const lineHeight = fontSize * 1.1;
 
         lines.forEach((line, index) => {
           const lineY = isTop
             ? y + index * lineHeight
             : y - (lines.length - 1 - index) * lineHeight;
 
-          // Draw black outline
+          // Draw thick black outline
           ctx.strokeStyle = 'black';
-          ctx.lineWidth = fontSize * 0.12;
+          ctx.lineWidth = fontSize * 0.15;
           ctx.lineJoin = 'round';
           ctx.miterLimit = 2;
-          ctx.strokeText(line, x, lineY);
+          for (let i = 0; i < 3; i++) {
+            ctx.strokeText(line, size / 2, lineY);
+          }
 
           // Draw white fill
           ctx.fillStyle = 'white';
-          ctx.fillText(line, x, lineY);
+          ctx.fillText(line, size / 2, lineY);
         });
       };
 
@@ -110,16 +112,16 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       const topText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
       const bottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
 
-      // Draw top text
+      // Draw top text at the VERY TOP of canvas (not just image)
       if (topText) {
         ctx.textBaseline = 'top';
-        drawMemeText(topText, size / 2, offsetY + padding, true);
+        drawMemeText(topText, padding, true);
       }
 
-      // Draw bottom text
+      // Draw bottom text at the VERY BOTTOM of canvas
       if (bottomText) {
         ctx.textBaseline = 'bottom';
-        drawMemeText(bottomText, size / 2, offsetY + scaledHeight - padding, false);
+        drawMemeText(bottomText, size - padding, false);
       }
 
       setIsLoaded(true);
