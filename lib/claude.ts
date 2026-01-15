@@ -167,48 +167,77 @@ RESPONSE FORMAT (JSON array only, no other text):
 ]`;
 
   try {
-    console.log('Calling Claude API for meme matching...');
-    const response = await getAnthropic().messages.create({
+    console.log('=== generateMemeMatches START ===');
+    console.log('API Key present:', !!process.env.ANTHROPIC_API_KEY);
+    console.log('API Key length:', process.env.ANTHROPIC_API_KEY?.length || 0);
+    console.log('Tweet:', tweet.slice(0, 50));
+    
+    const anthropic = getAnthropic();
+    console.log('Anthropic client created');
+    
+    const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1500,
       temperature: 0.8,
       messages: [{ role: 'user', content: prompt }],
     });
 
+    console.log('Claude response received');
+    console.log('Response content type:', response.content[0]?.type);
+    
     const content = response.content[0];
     if (content.type !== 'text') {
       console.error('Non-text response from Claude');
       return null;
     }
 
-    console.log('Claude response received, parsing...');
+    console.log('Response text length:', content.text.length);
+    console.log('Response preview:', content.text.slice(0, 300));
+    
     const parsed = extractJson(content.text);
     
     if (!Array.isArray(parsed)) {
-      console.error('Response is not an array:', content.text.slice(0, 200));
+      console.error('Response is not an array. Parsed:', typeof parsed);
+      console.error('Full response:', content.text);
       return null;
     }
+
+    console.log('Parsed array length:', parsed.length);
 
     // Validate and enrich matches
     const validMatches: MemeMatch[] = [];
     
     for (const match of parsed) {
+      console.log('Processing match:', JSON.stringify(match).slice(0, 100));
+      
       if (!match.templateId || !match.suggestedTopText || !match.suggestedBottomText) {
-        console.log('Skipping invalid match:', match);
+        console.log('Skipping invalid match - missing fields');
         continue;
       }
       
       const template = templates.find((t) => t.id === match.templateId);
       if (!template) {
         console.log('Template not found:', match.templateId);
-        continue;
+        // Try to find by name instead
+        const byName = templates.find((t) => 
+          t.name.toLowerCase().includes(match.templateName?.toLowerCase() || '')
+        );
+        if (byName) {
+          console.log('Found by name instead:', byName.id);
+          match.templateId = byName.id;
+        } else {
+          continue;
+        }
       }
       
-      const formatInfo = getMemeFormatInfo(template);
+      const finalTemplate = templates.find((t) => t.id === match.templateId);
+      if (!finalTemplate) continue;
+      
+      const formatInfo = getMemeFormatInfo(finalTemplate);
       
       validMatches.push({
         templateId: match.templateId,
-        templateName: match.templateName || template.name,
+        templateName: match.templateName || finalTemplate.name,
         reasoning: match.reasoning || 'Great match for this tweet',
         suggestedTopText: String(match.suggestedTopText).slice(0, 100),
         suggestedBottomText: String(match.suggestedBottomText).slice(0, 100),
@@ -220,10 +249,14 @@ RESPONSE FORMAT (JSON array only, no other text):
       });
     }
 
-    console.log(`Found ${validMatches.length} valid matches`);
+    console.log(`Valid matches found: ${validMatches.length}`);
+    console.log('=== generateMemeMatches END ===');
     return validMatches.length > 0 ? validMatches.slice(0, 3) : null;
   } catch (error) {
-    console.error('Claude API error:', error);
+    console.error('=== generateMemeMatches ERROR ===');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Full error:', error);
     return null;
   }
 }
@@ -299,41 +332,69 @@ function generateHardcodedFallback(
   templates: MemeTemplate[],
   excludeIds: string[] = []
 ): MemeMatch[] {
+  // Extract key elements from the tweet
+  const essence = extractTweetEssence(tweet);
+  
   const fallbackConfigs = [
     {
       id: '181913649',
       name: 'Drake Hotline Bling',
       format: 'comparison' as const,
-      topTransform: (t: string) => extractFirstPart(t) || 'The old way',
-      bottomTransform: (t: string) => extractSecondPart(t) || 'The new way',
-    },
-    {
-      id: '161865971',
-      name: 'Tuxedo Winnie the Pooh',
-      format: 'comparison' as const,
-      topTransform: (t: string) => extractFirstPart(t) || 'Normal approach',
-      bottomTransform: (t: string) => extractSecondPart(t) || 'Sophisticated approach',
-    },
-    {
-      id: '129242436',
-      name: 'Change My Mind',
-      format: 'label' as const,
-      topTransform: (t: string) => truncate(t, 60),
-      bottomTransform: () => 'Change my mind',
+      getTexts: () => ({
+        top: essence.badThing || essence.subject || truncate(tweet, 40),
+        bottom: essence.goodThing || essence.punchline || 'This instead',
+      }),
+      reasoning: 'Classic rejection/approval format',
     },
     {
       id: '155067746',
       name: 'Surprised Pikachu',
       format: 'reaction' as const,
-      topTransform: (t: string) => truncate(t, 50),
-      bottomTransform: () => '*surprised face*',
+      getTexts: () => ({
+        top: essence.action || truncate(tweet, 45),
+        bottom: essence.result || 'Everyone: *shocked*',
+      }),
+      reasoning: 'Perfect for obvious outcomes',
+    },
+    {
+      id: '129242436',
+      name: 'Change My Mind',
+      format: 'label' as const,
+      getTexts: () => ({
+        top: essence.hotTake || essence.subject || truncate(tweet, 50),
+        bottom: 'Change my mind',
+      }),
+      reasoning: 'Great for hot takes and opinions',
+    },
+    {
+      id: '252600902',
+      name: 'Always Has Been',
+      format: 'reaction' as const,
+      getTexts: () => ({
+        top: `Wait, ${essence.subject || 'it'}'s ${essence.quality || 'like this'}?`,
+        bottom: 'Always has been',
+      }),
+      reasoning: 'Reveals something was always true',
     },
     {
       id: '438680',
       name: 'Batman Slapping Robin',
       format: 'reaction' as const,
-      topTransform: (t: string) => extractFirstPart(t) || truncate(t, 40),
-      bottomTransform: (t: string) => extractSecondPart(t) || 'No.',
+      getTexts: () => ({
+        top: essence.badTake || truncate(tweet, 35),
+        bottom: essence.correction || 'No.',
+      }),
+      reasoning: 'Shutting down bad takes',
+    },
+    {
+      id: '161865971',
+      name: 'Tuxedo Winnie the Pooh',
+      format: 'comparison' as const,
+      getTexts: () => ({
+        top: essence.basicVersion || truncate(tweet, 40),
+        bottom: essence.fancyVersion || 'The sophisticated approach',
+      }),
+      reasoning: 'Basic vs fancy comparison',
     },
   ];
 
@@ -342,9 +403,11 @@ function generateHardcodedFallback(
     (c) => !excludeSet.has(c.id) && templates.some((t) => t.id === c.id)
   );
 
-  const selected = available.slice(0, 3);
+  // Shuffle to add variety
+  const shuffled = available.sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, 3);
+  
   if (selected.length < 3) {
-    // Add any available templates
     const remaining = templates
       .filter((t) => !excludeSet.has(t.id) && !selected.some((s) => s.id === t.id))
       .slice(0, 3 - selected.length);
@@ -354,82 +417,97 @@ function generateHardcodedFallback(
         id: t.id,
         name: t.name,
         format: 'reaction' as const,
-        topTransform: (tw: string) => truncate(tw, 50),
-        bottomTransform: () => 'Me, trying my best',
+        getTexts: () => ({
+          top: truncate(tweet, 45),
+          bottom: 'This is fine',
+        }),
+        reasoning: 'A versatile meme template',
       });
     }
   }
 
-  return selected.map((config) => ({
-    templateId: config.id,
-    templateName: config.name,
-    reasoning: 'A versatile meme for this type of content',
-    suggestedTopText: config.topTransform(tweet),
-    suggestedBottomText: config.bottomTransform(tweet),
-    format: config.format,
-    textBoxes: [
-      { position: 'top', text: config.topTransform(tweet) },
-      { position: 'bottom', text: config.bottomTransform(tweet) },
-    ],
-  }));
+  return selected.map((config) => {
+    const texts = config.getTexts();
+    return {
+      templateId: config.id,
+      templateName: config.name,
+      reasoning: config.reasoning,
+      suggestedTopText: texts.top,
+      suggestedBottomText: texts.bottom,
+      format: config.format,
+      textBoxes: [
+        { position: 'top', text: texts.top },
+        { position: 'bottom', text: texts.bottom },
+      ],
+    };
+  });
 }
 
-// Helper: extract first part of a comparison tweet (before vs/vs./|/→)
-function extractFirstPart(tweet: string): string | null {
-  // Common patterns: "X vs Y", "Tired: X / Wired: Y", "Before: X / After: Y"
-  const patterns = [
-    /tired[:\s]+(.+?)\s*[\/\|]\s*wired/i,
-    /before[:\s]+(.+?)\s*[\/\|]\s*after/i,
-    /old[:\s]+(.+?)\s*[\/\|]\s*new/i,
-    /(.+?)\s+vs\.?\s+/i,
-    /(.+?)\s*[→→]\s*/,
-    /(.+?)\s*[\/\|]\s*/,
-  ];
+// Extract meaningful elements from a tweet for better fallback captions
+function extractTweetEssence(tweet: string): {
+  subject?: string;
+  action?: string;
+  result?: string;
+  quality?: string;
+  hotTake?: string;
+  badThing?: string;
+  goodThing?: string;
+  badTake?: string;
+  correction?: string;
+  basicVersion?: string;
+  fancyVersion?: string;
+  punchline?: string;
+} {
+  const essence: ReturnType<typeof extractTweetEssence> = {};
   
-  for (const pattern of patterns) {
-    const match = tweet.match(pattern);
-    if (match?.[1]) {
-      return truncate(match[1].trim(), 50);
-    }
+  // Check for Tired/Wired pattern
+  const tiredWired = tweet.match(/tired[:\s]+(.+?)\s*[\/\|\n]\s*wired[:\s]+(.+)/i);
+  if (tiredWired) {
+    essence.badThing = truncate(tiredWired[1].trim(), 40);
+    essence.goodThing = truncate(tiredWired[2].trim(), 40);
+    essence.basicVersion = essence.badThing;
+    essence.fancyVersion = essence.goodThing;
   }
   
-  // If tweet has line breaks, use first line
-  const lines = tweet.split(/[\n\r]+/).filter((l) => l.trim());
-  if (lines.length >= 2) {
-    return truncate(lines[0].trim(), 50);
+  // Check for vs pattern
+  const vsMatch = tweet.match(/(.+?)\s+vs\.?\s+(.+)/i);
+  if (vsMatch && !essence.badThing) {
+    essence.badThing = truncate(vsMatch[1].trim(), 40);
+    essence.goodThing = truncate(vsMatch[2].trim(), 40);
   }
   
-  return null;
-}
-
-// Helper: extract second part of a comparison tweet
-function extractSecondPart(tweet: string): string | null {
-  const patterns = [
-    /wired[:\s]+(.+)/i,
-    /after[:\s]+(.+)/i,
-    /new[:\s]+(.+)/i,
-    /vs\.?\s+(.+)/i,
-    /[→→]\s*(.+)/,
-    /[\/\|]\s*(.+)/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = tweet.match(pattern);
-    if (match?.[1]) {
-      // Clean up any trailing patterns
-      let result = match[1].trim();
-      result = result.replace(/\s*[\/\|].+$/, '').trim();
-      return truncate(result, 50);
-    }
+  // Check for "X is Y" pattern (hot takes)
+  const isMatch = tweet.match(/^(.{10,50})\s+is\s+(.{5,30})/i);
+  if (isMatch) {
+    essence.subject = truncate(isMatch[1].trim(), 35);
+    essence.quality = truncate(isMatch[2].trim(), 25);
+    essence.hotTake = truncate(`${isMatch[1].trim()} is ${isMatch[2].trim()}`, 50);
   }
   
-  // If tweet has line breaks, use last line
-  const lines = tweet.split(/[\n\r]+/).filter((l) => l.trim());
-  if (lines.length >= 2) {
-    return truncate(lines[lines.length - 1].trim(), 50);
+  // Look for sentences/clauses
+  const sentences = tweet.split(/[.!?\n]+/).filter(s => s.trim().length > 5);
+  if (sentences.length >= 2) {
+    essence.action = truncate(sentences[0].trim(), 45);
+    essence.result = truncate(sentences[sentences.length - 1].trim(), 45);
+    essence.punchline = essence.result;
   }
   
-  return null;
+  // Extract main subject (first noun phrase or key term)
+  const words = tweet.split(/\s+/);
+  const capitalWords = words.filter(w => /^[A-Z][a-z]+/.test(w) && w.length > 2);
+  if (capitalWords.length > 0) {
+    essence.subject = capitalWords[0];
+  }
+  
+  // Look for negative statements (for Batman slap)
+  const negativeMatch = tweet.match(/(worst|bad|terrible|awful|sucks|hate|stupid|dumb)/i);
+  if (negativeMatch) {
+    const beforeNeg = tweet.slice(0, tweet.indexOf(negativeMatch[0])).trim();
+    essence.badTake = truncate(beforeNeg || tweet, 35);
+    essence.correction = 'Facts though';
+  }
+  
+  return essence;
 }
 
 function truncate(text: string, maxLen: number): string {
