@@ -1,10 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import {
-  MemeTemplate,
-  getCompactTemplateDescriptions,
-  getTemplateDescriptions,
-  getMemeFormatInfo,
-} from './imgflip';
+import { MemeTemplate, getMemeFormatInfo, MEME_FORMAT_DATABASE } from './imgflip';
 
 let anthropicInstance: Anthropic | null = null;
 
@@ -32,14 +27,6 @@ export interface MemeMatch {
   format: string;
 }
 
-interface MemeRewrite {
-  memePremise: string;
-  setup: string;
-  punchline: string;
-  tone: string;
-  tags: string[];
-}
-
 export interface MatchResult {
   matches: MemeMatch[];
   modified: boolean;
@@ -47,522 +34,441 @@ export interface MatchResult {
   message?: string;
 }
 
-// Popular versatile memes that work for almost any situation
-const FALLBACK_TEMPLATE_IDS = [
-  '181913649', // Drake Hotline Bling
-  '87743020',  // Two Buttons
-  '112126428', // Distracted Boyfriend
-  '129242436', // Change My Mind
-  '131087935', // Running Away Balloon
-  '224015000', // Bernie Sanders Once Again Asking
-];
-
-function pickRandomTemplates(
+// Build a curated template list with rich context
+function getCuratedTemplates(
   templates: MemeTemplate[],
-  count: number,
   excludeIds: string[] = []
-): MemeTemplate[] {
+): string {
   const excludeSet = new Set(excludeIds);
-  const eligible = templates.filter((t) => !excludeSet.has(t.id));
-  const shuffled = eligible.sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
-}
-
-function getFallbackMatches(
-  templates: MemeTemplate[],
-  tweet: string,
-  previousIds: string[] = [],
-  rewrite?: MemeRewrite | null
-): MemeMatch[] {
-  const fallbackTemplates = templates.filter((t) =>
-    FALLBACK_TEMPLATE_IDS.includes(t.id)
+  const curatedIds = Object.keys(MEME_FORMAT_DATABASE);
+  
+  // Get curated templates first (we have rich descriptions for these)
+  const curated = templates.filter(
+    (t) => curatedIds.includes(t.id) && !excludeSet.has(t.id)
   );
-
-  const templatesToUse =
-    fallbackTemplates.length >= 3
-      ? pickRandomTemplates(fallbackTemplates, 3, previousIds)
-      : pickRandomTemplates(templates.slice(0, 80), 3, previousIds);
-
-  const topText = rewrite?.setup || tweet;
-  const bottomText = rewrite?.punchline || 'Me, apparently';
-
-  return templatesToUse.map((t) => {
-    const format = getMemeFormatInfo(t);
-    return {
-      templateId: t.id,
-      templateName: t.name,
-      reasoning: 'A versatile meme that works well for expressing this idea',
-      suggestedTopText:
-        topText.length > 50 ? topText.substring(0, 50) + '...' : topText,
-      suggestedBottomText: bottomText,
-      textBoxes: format.textBoxes.map((box, i) => ({
-        text:
-          i === 0
-            ? topText.length > 50
-              ? topText.substring(0, 50) + '...'
-              : topText
-            : bottomText,
-        position: box.position,
-      })),
-      format: format.format,
-    };
-  });
+  
+  // Add some popular templates not in our curated list
+  const popular = templates
+    .filter((t) => !curatedIds.includes(t.id) && !excludeSet.has(t.id))
+    .slice(0, 25);
+  
+  const all = [...curated, ...popular];
+  
+  return all
+    .map((t) => {
+      const info = getMemeFormatInfo(t);
+      return `• ${t.name} (ID: ${t.id})
+  Format: ${info.format} | Boxes: ${t.box_count}
+  Best for: ${info.bestFor}
+  How it works: ${info.description}`;
+    })
+    .join('\n\n');
 }
 
-function extractJsonArray(text: string): string | null {
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1 || end <= start) {
-    return null;
+// Extract JSON from potentially messy LLM output
+function extractJson(text: string): unknown | null {
+  // Remove markdown code blocks
+  let cleaned = text.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/```(?:json)?\n?/g, '').replace(/```$/g, '').trim();
   }
-  return text.slice(start, end + 1);
-}
-
-function extractJsonObject(text: string): string | null {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) {
-    return null;
-  }
-  return text.slice(start, end + 1);
-}
-
-function extractJsonStringArray(text: string): string[] | null {
-  try {
-    const extracted = extractJsonArray(text) || text;
-    const parsed = JSON.parse(extracted);
-    if (!Array.isArray(parsed)) {
-      return null;
+  
+  // Try to find array
+  const arrayStart = cleaned.indexOf('[');
+  const arrayEnd = cleaned.lastIndexOf(']');
+  if (arrayStart !== -1 && arrayEnd > arrayStart) {
+    try {
+      return JSON.parse(cleaned.slice(arrayStart, arrayEnd + 1));
+    } catch {
+      // Continue to try other methods
     }
-    return parsed.filter((item) => typeof item === 'string');
+  }
+  
+  // Try to find object
+  const objStart = cleaned.indexOf('{');
+  const objEnd = cleaned.lastIndexOf('}');
+  if (objStart !== -1 && objEnd > objStart) {
+    try {
+      return JSON.parse(cleaned.slice(objStart, objEnd + 1));
+    } catch {
+      // Continue
+    }
+  }
+  
+  // Try parsing the whole thing
+  try {
+    return JSON.parse(cleaned);
   } catch {
     return null;
   }
 }
 
-function normalizeMatch(match: MemeMatch): MemeMatch {
-  const topFromBoxes = match.textBoxes?.find((box) => box.position === 'top')?.text;
-  const bottomFromBoxes = match.textBoxes?.find((box) => box.position === 'bottom')?.text;
-
-  return {
-    ...match,
-    suggestedTopText: match.suggestedTopText || topFromBoxes || '',
-    suggestedBottomText: match.suggestedBottomText || bottomFromBoxes || '',
-    textBoxes: match.textBoxes && match.textBoxes.length > 0
-      ? match.textBoxes
-      : [
-          { position: 'top', text: match.suggestedTopText || '' },
-          { position: 'bottom', text: match.suggestedBottomText || '' },
-        ],
-  };
-}
-
-async function selectTemplateIds(
+// Single, robust matching function
+async function generateMemeMatches(
   tweet: string,
   templates: MemeTemplate[],
-  rewrite: MemeRewrite | null,
-  previousIds?: string[]
-): Promise<string[] | null> {
-  const compactDescriptions = getCompactTemplateDescriptions(templates, {
-    maxTemplates: 140,
-    excludeIds: previousIds,
-  });
-
-  const rewriteClause = rewrite
-    ? `\nMeme-ready rewrite: "${rewrite.memePremise}"\nSetup: "${rewrite.setup}"\nPunchline: "${rewrite.punchline}"\nTone: ${rewrite.tone}\nTags: ${rewrite.tags?.join(', ') || ''}\n`
+  excludeIds: string[] = [],
+  feedback?: string
+): Promise<MemeMatch[] | null> {
+  const templateContext = getCuratedTemplates(templates, excludeIds);
+  
+  const feedbackLine = feedback
+    ? `\nUser feedback: "${feedback}" - use this to pick DIFFERENT memes than before.\n`
+    : '';
+  
+  const excludeLine = excludeIds.length > 0
+    ? `\nDO NOT USE these template IDs (already shown): ${excludeIds.join(', ')}\n`
     : '';
 
-  const excludeClause = previousIds?.length
-    ? `Avoid these template IDs: ${previousIds.join(', ')}`
-    : '';
+  const prompt = `You are a meme expert. Your job: turn this tweet into 3 hilarious memes.
 
-  const prompt = `Pick the BEST 8 meme templates for this tweet. Prioritize funny, specific, meme-correct formats.
+TWEET:
+"${tweet}"
+${feedbackLine}${excludeLine}
+AVAILABLE TEMPLATES:
+${templateContext}
 
-Tweet: "${tweet}"
-${rewriteClause}
-${excludeClause}
+YOUR TASK:
+1. Understand what the tweet is REALLY saying (the joke, the frustration, the insight)
+2. Pick 3 DIFFERENT templates that fit the tweet's vibe
+3. Write SHORT, PUNCHY captions (5-8 words max per line)
+4. Make it FUNNY - transform the tweet, don't just restate it
 
-Available templates (compact):
-${compactDescriptions}
+CRITICAL RULES:
+- Each meme must use a DIFFERENT template
+- Captions must be SHORT (under 8 words each)
+- The text must match how the meme format works (e.g., Drake = reject top, approve bottom)
+- NO generic text like "Me:" or "When you..." - be specific to the tweet
+- Make people actually want to share these memes
 
-Rules:
-- Avoid generic defaults (Drake, Two Buttons, Distracted Boyfriend) unless perfect.
-- Include a mix of formats (reaction, top-bottom, comparison, label).
-- If a template's "best for" doesn't fit, skip it.
-
-Return ONLY a JSON array of template IDs:
-["id1","id2","id3",...]`;
+RESPONSE FORMAT (JSON array only, no other text):
+[
+  {
+    "templateId": "exact ID from list",
+    "templateName": "template name",
+    "reasoning": "one sentence why this format fits",
+    "suggestedTopText": "short top text",
+    "suggestedBottomText": "short bottom text"
+  },
+  {
+    "templateId": "different ID",
+    "templateName": "template name",
+    "reasoning": "one sentence why",
+    "suggestedTopText": "top text",
+    "suggestedBottomText": "bottom text"
+  },
+  {
+    "templateId": "third different ID",
+    "templateName": "template name",
+    "reasoning": "one sentence why",
+    "suggestedTopText": "top text",
+    "suggestedBottomText": "bottom text"
+  }
+]`;
 
   try {
+    console.log('Calling Claude API for meme matching...');
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 256,
-      temperature: 0.4,
+      max_tokens: 1500,
+      temperature: 0.8,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const content = response.content[0];
     if (content.type !== 'text') {
+      console.error('Non-text response from Claude');
       return null;
     }
 
-    let jsonText = content.text.trim();
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
-    }
-
-    const ids = extractJsonStringArray(jsonText);
-    if (!ids || ids.length === 0) {
+    console.log('Claude response received, parsing...');
+    const parsed = extractJson(content.text);
+    
+    if (!Array.isArray(parsed)) {
+      console.error('Response is not an array:', content.text.slice(0, 200));
       return null;
     }
 
-    const validIds = ids.filter((id) => templates.some((t) => t.id === id));
-    return validIds.length > 0 ? validIds.slice(0, 10) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function rewriteTweetForMeme(tweet: string): Promise<MemeRewrite | null> {
-  try {
-    const response = await getAnthropic().messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 512,
-      temperature: 0.4,
-      messages: [
-        {
-          role: 'user',
-          content: `Rewrite this tweet into a meme-ready premise.
-
-Rules:
-- Keep the meaning, but make it sharper and meme-appropriate.
-- Provide a short setup + punchline that could fit top/bottom text.
-- Each line must be under 60 characters.
-- Use short, punchy fragments (not full sentences).
-
-Return ONLY JSON:
-{
-  "memePremise": "One-line meme-ready rewrite",
-  "setup": "Top text candidate",
-  "punchline": "Bottom text candidate",
-  "tone": "tone label",
-  "tags": ["tag1", "tag2"]
-}
-
-Tweet: "${tweet}"`,
-        },
-      ],
-    });
-
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      return null;
-    }
-
-    let jsonText = content.text.trim();
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
-    }
-
-    const extracted = extractJsonObject(jsonText) || jsonText;
-    const rewrite = JSON.parse(extracted) as MemeRewrite;
-
-    if (!rewrite.memePremise || !rewrite.setup || !rewrite.punchline) {
-      return null;
-    }
-
-    return rewrite;
-  } catch {
-    return null;
-  }
-}
-
-async function tryMatchWithPrompt(
-  tweet: string,
-  templates: MemeTemplate[],
-  feedback?: string,
-  previousIds?: string[],
-  options: { maxTemplates?: number; compact?: boolean; rewrite?: MemeRewrite | null } = {}
-): Promise<MemeMatch[] | null> {
-  const { maxTemplates = 150, compact = false, rewrite = null } = options;
-  const templateDescriptions = getTemplateDescriptions(templates, {
-    maxTemplates,
-    excludeIds: previousIds,
-  });
-
-  const excludeClause = previousIds?.length
-    ? `\n\nIMPORTANT: Do NOT suggest these template IDs as they were already shown: ${previousIds.join(', ')}`
-    : '';
-
-  const feedbackClause = feedback
-    ? `\n\nUser feedback on previous suggestions: "${feedback}". Take this into account when selecting new memes.`
-    : '';
-
-  const rewriteClause = rewrite
-    ? `\nMeme-ready rewrite: "${rewrite.memePremise}"\nSuggested setup: "${rewrite.setup}"\nSuggested punchline: "${rewrite.punchline}"\nTone: ${rewrite.tone}\nTags: ${rewrite.tags?.join(', ') || ''}\n`
-    : '';
-
-  const prompt = compact
-    ? `You are a meme expert. Pick the 3 funniest meme templates for the tweet below.
-
-Tweet: "${tweet}"
-${rewriteClause}${feedbackClause}${excludeClause}
-
-Available templates:
-${templateDescriptions}
-
-Rules:
-- Prefer 2-box memes unless a multi-panel is PERFECT.
-- Avoid generic defaults (Drake, Two Buttons, Distracted Boyfriend) unless truly the best.
-- 6-8 words per text box max.
-- Transform the tweet into a clear meme joke (do not restate).
-
-Return ONLY a JSON array with exactly 3 items:
-[
-  {
-    "templateId": "ID from list above",
-    "templateName": "Meme name",
-    "reasoning": "Why it fits",
-    "format": "comparison|top-bottom|multi-panel|reaction|label",
-    "textBoxes": [
-      {"position": "top|bottom|left|right|center|panel1|panel2|etc", "text": "Short punchy text"}
-    ],
-    "suggestedTopText": "Text for top (for 2-box memes)",
-    "suggestedBottomText": "Text for bottom (for 2-box memes)"
-  }
-]`
-    : `You are a legendary meme lord with encyclopedic knowledge of internet culture. Your job is to create HILARIOUS, VIRAL-WORTHY meme suggestions that make people actually laugh out loud.
-
-## THE TWEET TO MEME-IFY:
-"${tweet}"
-${rewriteClause}${feedbackClause}${excludeClause}
-
-## AVAILABLE MEME TEMPLATES:
-${templateDescriptions}
-
-## YOUR MISSION:
-Create 3 meme suggestions that are genuinely FUNNY. Not just relevant - FUNNY. The kind of meme someone would actually share.
-
-## QUALITY RULES:
-1. Prefer 2-box memes (top/bottom) unless a multi-panel format is PERFECT.
-2. Avoid the generic defaults (Drake, Two Buttons, Distracted Boyfriend) unless they are truly the best fit.
-3. Each pick must feel distinct — different format, different joke structure, different vibe.
-4. Text must be short and punchy (6-8 words per box max).
-5. Do NOT restate the tweet — transform it into a meme format with a clear joke.
-6. Be specific and internet-native. If you can't think of a strong angle, pick a better template.
-
-## RESPONSE FORMAT (JSON array, no markdown):
-[
-  {
-    "templateId": "ID from list above",
-    "templateName": "Meme name",
-    "reasoning": "Why this meme format perfectly captures the tweet's vibe",
-    "format": "comparison|top-bottom|multi-panel|reaction|label",
-    "textBoxes": [
-      {"position": "top|bottom|left|right|center|panel1|panel2|etc", "text": "Short punchy text"},
-      ...
-    ],
-    "suggestedTopText": "Text for top (for 2-box memes)",
-    "suggestedBottomText": "Text for bottom (for 2-box memes)"
-  }
-]
-
-Respond ONLY with the JSON array.`;
-
-  try {
-    const response = await getAnthropic().messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      temperature: compact ? 0.6 : 0.7,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    });
-
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      return null;
-    }
-
-    // Try to extract JSON from the response (handle markdown code blocks)
-    let jsonText = content.text.trim();
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
-    }
-
-    const extracted = extractJsonArray(jsonText) || jsonText;
-    const rawMatches = JSON.parse(extracted);
-
-    // Enrich matches with format info and validate
-    const matches: MemeMatch[] = rawMatches
-      .map((match: MemeMatch) => {
-      const template = templates.find(t => t.id === match.templateId);
-      if (!template) return null;
+    // Validate and enrich matches
+    const validMatches: MemeMatch[] = [];
+    
+    for (const match of parsed) {
+      if (!match.templateId || !match.suggestedTopText || !match.suggestedBottomText) {
+        console.log('Skipping invalid match:', match);
+        continue;
+      }
+      
+      const template = templates.find((t) => t.id === match.templateId);
+      if (!template) {
+        console.log('Template not found:', match.templateId);
+        continue;
+      }
       
       const formatInfo = getMemeFormatInfo(template);
       
-      return normalizeMatch({
-        ...match,
-        format: match.format || formatInfo.format,
-        textBoxes: match.textBoxes || [
-          { position: 'top', text: match.suggestedTopText },
-          { position: 'bottom', text: match.suggestedBottomText },
+      validMatches.push({
+        templateId: match.templateId,
+        templateName: match.templateName || template.name,
+        reasoning: match.reasoning || 'Great match for this tweet',
+        suggestedTopText: String(match.suggestedTopText).slice(0, 100),
+        suggestedBottomText: String(match.suggestedBottomText).slice(0, 100),
+        format: formatInfo.format,
+        textBoxes: [
+          { position: 'top', text: String(match.suggestedTopText).slice(0, 100) },
+          { position: 'bottom', text: String(match.suggestedBottomText).slice(0, 100) },
         ],
       });
-    })
-      .filter(Boolean);
-
-    if (matches.length === 0) {
-      return null;
     }
 
-    return matches.slice(0, 3);
+    console.log(`Found ${validMatches.length} valid matches`);
+    return validMatches.length > 0 ? validMatches.slice(0, 3) : null;
   } catch (error) {
-    console.error('Match attempt failed:', error);
+    console.error('Claude API error:', error);
     return null;
   }
 }
 
-async function simplifyTweet(tweet: string): Promise<{ simplified: string; original: string } | null> {
+// Intelligent fallback - still uses AI but with a simpler prompt
+async function generateFallbackMatches(
+  tweet: string,
+  templates: MemeTemplate[],
+  excludeIds: string[] = []
+): Promise<MemeMatch[]> {
+  // Try a simpler, more constrained prompt
+  const simpleTemplates = [
+    { id: '181913649', name: 'Drake Hotline Bling', hint: 'reject A, prefer B' },
+    { id: '161865971', name: 'Tuxedo Winnie the Pooh', hint: 'basic vs fancy' },
+    { id: '155067746', name: 'Surprised Pikachu', hint: 'obvious result is obvious' },
+    { id: '129242436', name: 'Change My Mind', hint: 'hot take statement' },
+    { id: '438680', name: 'Batman Slapping Robin', hint: 'shut down bad take' },
+    { id: '252600902', name: 'Always Has Been', hint: 'reveal something was always true' },
+  ].filter((t) => !excludeIds.includes(t.id));
+
+  const simplePrompt = `Turn this tweet into 3 memes. Be creative and funny.
+
+Tweet: "${tweet}"
+
+Available memes:
+${simpleTemplates.map((t) => `• ${t.name} (ID: ${t.id}) - ${t.hint}`).join('\n')}
+
+Reply with JSON array only:
+[{"templateId":"ID","templateName":"name","suggestedTopText":"top","suggestedBottomText":"bottom","reasoning":"why"}]`;
+
   try {
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 256,
-      temperature: 0.3,
-      messages: [
-        {
-          role: 'user',
-          content: `Simplify this tweet into a clear, meme-friendly statement that captures the core meaning. Keep it under 100 characters. Just respond with the simplified text, nothing else.
-
-Tweet: "${tweet}"`,
-        },
-      ],
+      max_tokens: 800,
+      temperature: 0.9,
+      messages: [{ role: 'user', content: simplePrompt }],
     });
 
     const content = response.content[0];
-    if (content.type !== 'text') {
-      return null;
+    if (content.type === 'text') {
+      const parsed = extractJson(content.text);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.slice(0, 3).map((m) => {
+          const template = templates.find((t) => t.id === m.templateId);
+          const formatInfo = template ? getMemeFormatInfo(template) : null;
+          return {
+            templateId: m.templateId || '181913649',
+            templateName: m.templateName || 'Meme',
+            reasoning: m.reasoning || 'A good fit for this tweet',
+            suggestedTopText: String(m.suggestedTopText || tweet).slice(0, 80),
+            suggestedBottomText: String(m.suggestedBottomText || 'This is fine').slice(0, 80),
+            format: formatInfo?.format || 'comparison',
+            textBoxes: [
+              { position: 'top', text: String(m.suggestedTopText || tweet).slice(0, 80) },
+              { position: 'bottom', text: String(m.suggestedBottomText || 'This is fine').slice(0, 80) },
+            ],
+          };
+        });
+      }
     }
-
-    return {
-      simplified: content.text.trim(),
-      original: tweet,
-    };
-  } catch {
-    return null;
+  } catch (error) {
+    console.error('Fallback AI also failed:', error);
   }
+
+  // Ultimate fallback: generate captions based on tweet structure
+  console.log('Using hardcoded fallback with tweet-based captions');
+  return generateHardcodedFallback(tweet, templates, excludeIds);
 }
 
+// Last resort: hardcoded templates with tweet-derived captions
+function generateHardcodedFallback(
+  tweet: string,
+  templates: MemeTemplate[],
+  excludeIds: string[] = []
+): MemeMatch[] {
+  const fallbackConfigs = [
+    {
+      id: '181913649',
+      name: 'Drake Hotline Bling',
+      format: 'comparison' as const,
+      topTransform: (t: string) => extractFirstPart(t) || 'The old way',
+      bottomTransform: (t: string) => extractSecondPart(t) || 'The new way',
+    },
+    {
+      id: '161865971',
+      name: 'Tuxedo Winnie the Pooh',
+      format: 'comparison' as const,
+      topTransform: (t: string) => extractFirstPart(t) || 'Normal approach',
+      bottomTransform: (t: string) => extractSecondPart(t) || 'Sophisticated approach',
+    },
+    {
+      id: '129242436',
+      name: 'Change My Mind',
+      format: 'label' as const,
+      topTransform: (t: string) => truncate(t, 60),
+      bottomTransform: () => 'Change my mind',
+    },
+    {
+      id: '155067746',
+      name: 'Surprised Pikachu',
+      format: 'reaction' as const,
+      topTransform: (t: string) => truncate(t, 50),
+      bottomTransform: () => '*surprised face*',
+    },
+    {
+      id: '438680',
+      name: 'Batman Slapping Robin',
+      format: 'reaction' as const,
+      topTransform: (t: string) => extractFirstPart(t) || truncate(t, 40),
+      bottomTransform: (t: string) => extractSecondPart(t) || 'No.',
+    },
+  ];
+
+  const excludeSet = new Set(excludeIds);
+  const available = fallbackConfigs.filter(
+    (c) => !excludeSet.has(c.id) && templates.some((t) => t.id === c.id)
+  );
+
+  const selected = available.slice(0, 3);
+  if (selected.length < 3) {
+    // Add any available templates
+    const remaining = templates
+      .filter((t) => !excludeSet.has(t.id) && !selected.some((s) => s.id === t.id))
+      .slice(0, 3 - selected.length);
+    
+    for (const t of remaining) {
+      selected.push({
+        id: t.id,
+        name: t.name,
+        format: 'top-bottom' as const,
+        topTransform: (tw: string) => truncate(tw, 50),
+        bottomTransform: () => 'Me, trying my best',
+      });
+    }
+  }
+
+  return selected.map((config) => ({
+    templateId: config.id,
+    templateName: config.name,
+    reasoning: 'A versatile meme for this type of content',
+    suggestedTopText: config.topTransform(tweet),
+    suggestedBottomText: config.bottomTransform(tweet),
+    format: config.format,
+    textBoxes: [
+      { position: 'top', text: config.topTransform(tweet) },
+      { position: 'bottom', text: config.bottomTransform(tweet) },
+    ],
+  }));
+}
+
+// Helper: extract first part of a comparison tweet (before vs/vs./|/→)
+function extractFirstPart(tweet: string): string | null {
+  // Common patterns: "X vs Y", "Tired: X / Wired: Y", "Before: X / After: Y"
+  const patterns = [
+    /tired[:\s]+(.+?)\s*[\/\|]\s*wired/i,
+    /before[:\s]+(.+?)\s*[\/\|]\s*after/i,
+    /old[:\s]+(.+?)\s*[\/\|]\s*new/i,
+    /(.+?)\s+vs\.?\s+/i,
+    /(.+?)\s*[→→]\s*/,
+    /(.+?)\s*[\/\|]\s*/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = tweet.match(pattern);
+    if (match?.[1]) {
+      return truncate(match[1].trim(), 50);
+    }
+  }
+  
+  // If tweet has line breaks, use first line
+  const lines = tweet.split(/[\n\r]+/).filter((l) => l.trim());
+  if (lines.length >= 2) {
+    return truncate(lines[0].trim(), 50);
+  }
+  
+  return null;
+}
+
+// Helper: extract second part of a comparison tweet
+function extractSecondPart(tweet: string): string | null {
+  const patterns = [
+    /wired[:\s]+(.+)/i,
+    /after[:\s]+(.+)/i,
+    /new[:\s]+(.+)/i,
+    /vs\.?\s+(.+)/i,
+    /[→→]\s*(.+)/,
+    /[\/\|]\s*(.+)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = tweet.match(pattern);
+    if (match?.[1]) {
+      // Clean up any trailing patterns
+      let result = match[1].trim();
+      result = result.replace(/\s*[\/\|].+$/, '').trim();
+      return truncate(result, 50);
+    }
+  }
+  
+  // If tweet has line breaks, use last line
+  const lines = tweet.split(/[\n\r]+/).filter((l) => l.trim());
+  if (lines.length >= 2) {
+    return truncate(lines[lines.length - 1].trim(), 50);
+  }
+  
+  return null;
+}
+
+function truncate(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen - 3) + '...';
+}
+
+// Main export
 export async function matchTweetToMemes(
   tweet: string,
   templates: MemeTemplate[],
   feedback?: string,
   previousIds?: string[]
 ): Promise<MatchResult> {
-  const rewrite = await rewriteTweetForMeme(tweet);
-  const primaryTweet = rewrite?.memePremise || tweet;
-  const rewriteMessage = rewrite
-    ? `We rewrote your tweet to improve meme fit: "${rewrite.memePremise}"`
-    : undefined;
+  const excludeIds = previousIds || [];
+  
+  console.log('=== Starting meme matching ===');
+  console.log('Tweet:', tweet);
+  console.log('Excluded IDs:', excludeIds);
 
-  const selectedIds = await selectTemplateIds(
-    primaryTweet,
-    templates,
-    rewrite,
-    previousIds
-  );
-  const selectedTemplates = selectedIds
-    ? templates.filter((t) => selectedIds.includes(t.id))
-    : null;
-
-  // First attempt: try with rewritten meme premise (if available)
-  console.log('Attempting match with meme-ready rewrite...');
-  const firstAttempt = await tryMatchWithPrompt(
-    primaryTweet,
-    selectedTemplates && selectedTemplates.length >= 4 ? selectedTemplates : templates,
-    feedback,
-    previousIds,
-    { rewrite }
-  );
-
-  if (firstAttempt && firstAttempt.length >= 1) {
+  // First attempt: full matching
+  const matches = await generateMemeMatches(tweet, templates, excludeIds, feedback);
+  
+  if (matches && matches.length > 0) {
+    console.log('Primary matching succeeded');
     return {
-      matches: firstAttempt,
-      modified: Boolean(rewrite) && primaryTweet !== tweet,
-      modifiedTweet: rewrite?.memePremise,
-      message: rewriteMessage,
+      matches,
+      modified: false,
     };
   }
 
-  // Retry with a smaller template set + compact prompt to avoid formatting issues
-  const retryAttempt = await tryMatchWithPrompt(
-    primaryTweet,
-    selectedTemplates && selectedTemplates.length >= 4 ? selectedTemplates : templates,
-    feedback,
-    previousIds,
-    { maxTemplates: 90, compact: true, rewrite }
-  );
-
-  if (retryAttempt && retryAttempt.length >= 1) {
-    return {
-      matches: retryAttempt,
-      modified: Boolean(rewrite) && primaryTweet !== tweet,
-      modifiedTweet: rewrite?.memePremise,
-      message: rewriteMessage,
-    };
-  }
-
-  // If rewrite failed to match, try original tweet directly
-  if (rewrite && primaryTweet !== tweet) {
-    const originalAttempt = await tryMatchWithPrompt(
-      tweet,
-      templates,
-      feedback,
-      previousIds,
-      { maxTemplates: 120 }
-    );
-
-    if (originalAttempt && originalAttempt.length >= 1) {
-      return {
-        matches: originalAttempt,
-        modified: false,
-      };
-    }
-  }
-
-  // Second attempt: simplify the tweet and try again
-  console.log('First attempt failed, trying with simplified tweet...');
-  const simplified = await simplifyTweet(primaryTweet);
-
-  if (simplified) {
-    const secondAttempt = await tryMatchWithPrompt(
-      simplified.simplified,
-      templates,
-      feedback,
-      previousIds,
-      { maxTemplates: 120, rewrite }
-    );
-
-    if (secondAttempt && secondAttempt.length >= 1) {
-      return {
-        matches: secondAttempt,
-        modified: true,
-        modifiedTweet: simplified.simplified,
-        message: `We simplified your tweet to better match meme formats: "${simplified.simplified}"`,
-      };
-    }
-  }
-
-  // Final fallback: return popular versatile memes
-  console.log('All attempts failed, using fallback memes...');
+  console.log('Primary matching failed, trying fallback...');
+  
+  // Second attempt: simpler fallback with AI
+  const fallbackMatches = await generateFallbackMatches(tweet, templates, excludeIds);
+  
   return {
-    matches: getFallbackMatches(templates, primaryTweet, previousIds, rewrite),
+    matches: fallbackMatches,
     modified: true,
-    message:
-      rewriteMessage ||
-      "We couldn't find a perfect match, so here are some versatile memes that might work. Try the feedback button for different options!",
+    message: "We generated some meme options for you. Click 'Try again' for different choices!",
   };
 }
