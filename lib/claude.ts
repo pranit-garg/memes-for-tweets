@@ -1,5 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { MemeTemplate, getTemplateDescriptions, getMemeFormatInfo } from './imgflip';
+import {
+  MemeTemplate,
+  getCompactTemplateDescriptions,
+  getTemplateDescriptions,
+  getMemeFormatInfo,
+} from './imgflip';
 
 let anthropicInstance: Anthropic | null = null;
 
@@ -122,6 +127,19 @@ function extractJsonObject(text: string): string | null {
   return text.slice(start, end + 1);
 }
 
+function extractJsonStringArray(text: string): string[] | null {
+  try {
+    const extracted = extractJsonArray(text) || text;
+    const parsed = JSON.parse(extracted);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed.filter((item) => typeof item === 'string');
+  } catch {
+    return null;
+  }
+}
+
 function normalizeMatch(match: MemeMatch): MemeMatch {
   const topFromBoxes = match.textBoxes?.find((box) => box.position === 'top')?.text;
   const bottomFromBoxes = match.textBoxes?.find((box) => box.position === 'bottom')?.text;
@@ -139,11 +157,78 @@ function normalizeMatch(match: MemeMatch): MemeMatch {
   };
 }
 
+async function selectTemplateIds(
+  tweet: string,
+  templates: MemeTemplate[],
+  rewrite: MemeRewrite | null,
+  previousIds?: string[]
+): Promise<string[] | null> {
+  const compactDescriptions = getCompactTemplateDescriptions(templates, {
+    maxTemplates: 140,
+    excludeIds: previousIds,
+  });
+
+  const rewriteClause = rewrite
+    ? `\nMeme-ready rewrite: "${rewrite.memePremise}"\nSetup: "${rewrite.setup}"\nPunchline: "${rewrite.punchline}"\nTone: ${rewrite.tone}\nTags: ${rewrite.tags?.join(', ') || ''}\n`
+    : '';
+
+  const excludeClause = previousIds?.length
+    ? `Avoid these template IDs: ${previousIds.join(', ')}`
+    : '';
+
+  const prompt = `Pick the BEST 8 meme templates for this tweet. Prioritize funny, specific, meme-correct formats.
+
+Tweet: "${tweet}"
+${rewriteClause}
+${excludeClause}
+
+Available templates (compact):
+${compactDescriptions}
+
+Rules:
+- Avoid generic defaults (Drake, Two Buttons, Distracted Boyfriend) unless perfect.
+- Include a mix of formats (reaction, top-bottom, comparison, label).
+- If a template's "best for" doesn't fit, skip it.
+
+Return ONLY a JSON array of template IDs:
+["id1","id2","id3",...]`;
+
+  try {
+    const response = await getAnthropic().messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 256,
+      temperature: 0.4,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type !== 'text') {
+      return null;
+    }
+
+    let jsonText = content.text.trim();
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    const ids = extractJsonStringArray(jsonText);
+    if (!ids || ids.length === 0) {
+      return null;
+    }
+
+    const validIds = ids.filter((id) => templates.some((t) => t.id === id));
+    return validIds.length > 0 ? validIds.slice(0, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function rewriteTweetForMeme(tweet: string): Promise<MemeRewrite | null> {
   try {
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 512,
+      temperature: 0.4,
       messages: [
         {
           role: 'user',
@@ -288,6 +373,7 @@ Respond ONLY with the JSON array.`;
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
+      temperature: compact ? 0.6 : 0.7,
       messages: [
         {
           role: 'user',
@@ -345,6 +431,7 @@ async function simplifyTweet(tweet: string): Promise<{ simplified: string; origi
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 256,
+      temperature: 0.3,
       messages: [
         {
           role: 'user',
@@ -381,11 +468,21 @@ export async function matchTweetToMemes(
     ? `We rewrote your tweet to improve meme fit: "${rewrite.memePremise}"`
     : undefined;
 
+  const selectedIds = await selectTemplateIds(
+    primaryTweet,
+    templates,
+    rewrite,
+    previousIds
+  );
+  const selectedTemplates = selectedIds
+    ? templates.filter((t) => selectedIds.includes(t.id))
+    : null;
+
   // First attempt: try with rewritten meme premise (if available)
   console.log('Attempting match with meme-ready rewrite...');
   const firstAttempt = await tryMatchWithPrompt(
     primaryTweet,
-    templates,
+    selectedTemplates && selectedTemplates.length >= 4 ? selectedTemplates : templates,
     feedback,
     previousIds,
     { rewrite }
@@ -403,7 +500,7 @@ export async function matchTweetToMemes(
   // Retry with a smaller template set + compact prompt to avoid formatting issues
   const retryAttempt = await tryMatchWithPrompt(
     primaryTweet,
-    templates,
+    selectedTemplates && selectedTemplates.length >= 4 ? selectedTemplates : templates,
     feedback,
     previousIds,
     { maxTemplates: 90, compact: true, rewrite }

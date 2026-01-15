@@ -459,6 +459,39 @@ interface TemplateDescriptionOptions {
   excludeIds?: string[];
 }
 
+export function getCompactTemplateDescriptions(
+  templates: MemeTemplate[],
+  options: TemplateDescriptionOptions = {}
+): string {
+  const { maxTemplates = 140, excludeIds = [] } = options;
+  const excludeSet = new Set(excludeIds);
+
+  const curatedIds = new Set(Object.keys(MEME_FORMAT_DATABASE));
+  const curatedTemplates = templates.filter(
+    (t) => curatedIds.has(t.id) && !excludeSet.has(t.id)
+  );
+
+  const remainingTemplates = templates.filter(
+    (t) => !curatedIds.has(t.id) && !excludeSet.has(t.id)
+  );
+
+  const topSlice = remainingTemplates.slice(0, 120);
+  const randomSlice = shuffleArray(remainingTemplates.slice(120)).slice(0, 60);
+
+  const combined = [
+    ...curatedTemplates,
+    ...topSlice,
+    ...randomSlice,
+  ].slice(0, maxTemplates);
+
+  return combined
+    .map((t) => {
+      const format = getMemeFormatInfo(t);
+      return `ID: ${t.id} | ${t.name} | ${format.format} | boxes: ${t.box_count} | best: ${format.bestFor}`;
+    })
+    .join('\n');
+}
+
 export function getTemplateDescriptions(
   templates: MemeTemplate[],
   options: TemplateDescriptionOptions = {}
