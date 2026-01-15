@@ -50,12 +50,12 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       // Draw image centered
       ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
 
-      // Configure text style - smaller font for thumbnails to not obscure image
-      const fontSize = Math.max(12, Math.min(16, size / 20));
+      // Configure text style - SMALL font for thumbnails to not obscure image
+      const fontSize = Math.max(10, Math.min(13, size / 24));
       ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
       ctx.textAlign = 'center';
 
-      const padding = 4;
+      const padding = 2; // Minimal padding - absolute edge
       const maxTextWidth = size - padding * 2;
 
       // Helper to wrap text - more aggressive for thumbnails
@@ -83,10 +83,10 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
         return lines.slice(0, 2); // Max 2 lines for preview
       };
 
-      // Helper to draw meme text with outline at the VERY edges
+      // Helper to draw meme text with outline at ABSOLUTE edges
       const drawMemeText = (text: string, y: number, isTop: boolean) => {
         const lines = wrapText(text.toUpperCase(), maxTextWidth);
-        const lineHeight = fontSize * 1.1;
+        const lineHeight = fontSize * 1.05;
 
         lines.forEach((line, index) => {
           const lineY = isTop
@@ -95,7 +95,7 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
 
           // Draw thick black outline
           ctx.strokeStyle = 'black';
-          ctx.lineWidth = fontSize * 0.15;
+          ctx.lineWidth = fontSize * 0.18;
           ctx.lineJoin = 'round';
           ctx.miterLimit = 2;
           for (let i = 0; i < 3; i++) {
@@ -112,13 +112,13 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       const topText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
       const bottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
 
-      // Draw top text at the VERY TOP of canvas (not just image)
+      // Draw top text at ABSOLUTE TOP - minimal offset from edge
       if (topText) {
         ctx.textBaseline = 'top';
         drawMemeText(topText, padding, true);
       }
 
-      // Draw bottom text at the VERY BOTTOM of canvas
+      // Draw bottom text at ABSOLUTE BOTTOM
       if (bottomText) {
         ctx.textBaseline = 'bottom';
         drawMemeText(bottomText, size - padding, false);

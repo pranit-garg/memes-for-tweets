@@ -108,13 +108,13 @@ export default function MemeEditor({
   const [isDownloading, setIsDownloading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   
-  // Text customization settings
+  // Text customization settings - default to smaller text that doesn't cover image
   const [topSettings, setTopSettings] = useState<TextSettings>({
-    fontSize: 50, // percentage of auto-calculated size
+    fontSize: 40, // percentage of auto-calculated size (smaller default)
     yOffset: 0,   // 0 = at edge, higher = more toward center
   });
   const [bottomSettings, setBottomSettings] = useState<TextSettings>({
-    fontSize: 50,
+    fontSize: 40,
     yOffset: 0,
   });
   const [, setTextBoxes] = useState<TextBox[]>(
@@ -154,22 +154,25 @@ export default function MemeEditor({
       // Draw image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Calculate text sizing based on image dimensions
-      const baseFontSize = Math.min(canvas.width / 10, canvas.height / 12);
-      const padding = canvas.width * 0.03;
+      // Calculate text sizing - SMALLER to not cover image content
+      // Base size is ~1/14 of width, user can scale from 20% to 100% of that
+      const baseFontSize = Math.min(canvas.width / 14, canvas.height / 16);
+      const padding = canvas.width * 0.02; // Minimal padding - text at absolute edge
       const maxTextWidth = canvas.width - padding * 2;
 
-      // Draw top text - positioned at the VERY TOP
+      // Draw top text - at the ABSOLUTE TOP EDGE
       if (topText.trim()) {
         const fontSize = baseFontSize * (topSettings.fontSize / 50);
-        const yPos = padding + (topSettings.yOffset / 100) * (canvas.height * 0.15);
+        // yOffset moves text DOWN from the top edge (toward center)
+        const yPos = padding + (topSettings.yOffset / 100) * (canvas.height * 0.2);
         drawMemeText(ctx, topText, canvas.width / 2, yPos, fontSize, maxTextWidth, false);
       }
 
-      // Draw bottom text - positioned at the VERY BOTTOM
+      // Draw bottom text - at the ABSOLUTE BOTTOM EDGE
       if (bottomText.trim()) {
         const fontSize = baseFontSize * (bottomSettings.fontSize / 50);
-        const yPos = canvas.height - padding - (bottomSettings.yOffset / 100) * (canvas.height * 0.15);
+        // yOffset moves text UP from the bottom edge (toward center)
+        const yPos = canvas.height - padding - (bottomSettings.yOffset / 100) * (canvas.height * 0.2);
         drawMemeText(ctx, bottomText, canvas.width / 2, yPos, fontSize, maxTextWidth, true);
       }
     };
