@@ -27,6 +27,14 @@ export interface MemeMatch {
   format: string;
 }
 
+interface MemeRewrite {
+  memePremise: string;
+  setup: string;
+  punchline: string;
+  tone: string;
+  tags: string[];
+}
+
 export interface MatchResult {
   matches: MemeMatch[];
   modified: boolean;
@@ -58,7 +66,8 @@ function pickRandomTemplates(
 function getFallbackMatches(
   templates: MemeTemplate[],
   tweet: string,
-  previousIds: string[] = []
+  previousIds: string[] = [],
+  rewrite?: MemeRewrite | null
 ): MemeMatch[] {
   const fallbackTemplates = templates.filter((t) =>
     FALLBACK_TEMPLATE_IDS.includes(t.id)
@@ -69,6 +78,9 @@ function getFallbackMatches(
       ? pickRandomTemplates(fallbackTemplates, 3, previousIds)
       : pickRandomTemplates(templates.slice(0, 80), 3, previousIds);
 
+  const topText = rewrite?.setup || tweet;
+  const bottomText = rewrite?.punchline || 'Me, apparently';
+
   return templatesToUse.map((t) => {
     const format = getMemeFormatInfo(t);
     return {
@@ -76,15 +88,15 @@ function getFallbackMatches(
       templateName: t.name,
       reasoning: 'A versatile meme that works well for expressing this idea',
       suggestedTopText:
-        tweet.length > 50 ? tweet.substring(0, 50) + '...' : tweet,
-      suggestedBottomText: 'Me, apparently',
+        topText.length > 50 ? topText.substring(0, 50) + '...' : topText,
+      suggestedBottomText: bottomText,
       textBoxes: format.textBoxes.map((box, i) => ({
         text:
           i === 0
-            ? tweet.length > 50
-              ? tweet.substring(0, 50) + '...'
-              : tweet
-            : 'Me, apparently',
+            ? topText.length > 50
+              ? topText.substring(0, 50) + '...'
+              : topText
+            : bottomText,
         position: box.position,
       })),
       format: format.format,
@@ -95,6 +107,15 @@ function getFallbackMatches(
 function extractJsonArray(text: string): string | null {
   const start = text.indexOf('[');
   const end = text.lastIndexOf(']');
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return text.slice(start, end + 1);
+}
+
+function extractJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
   if (start === -1 || end === -1 || end <= start) {
     return null;
   }
@@ -118,14 +139,67 @@ function normalizeMatch(match: MemeMatch): MemeMatch {
   };
 }
 
+async function rewriteTweetForMeme(tweet: string): Promise<MemeRewrite | null> {
+  try {
+    const response = await getAnthropic().messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: `Rewrite this tweet into a meme-ready premise.
+
+Rules:
+- Keep the meaning, but make it sharper and meme-appropriate.
+- Provide a short setup + punchline that could fit top/bottom text.
+- Each line must be under 60 characters.
+- Use short, punchy fragments (not full sentences).
+
+Return ONLY JSON:
+{
+  "memePremise": "One-line meme-ready rewrite",
+  "setup": "Top text candidate",
+  "punchline": "Bottom text candidate",
+  "tone": "tone label",
+  "tags": ["tag1", "tag2"]
+}
+
+Tweet: "${tweet}"`,
+        },
+      ],
+    });
+
+    const content = response.content[0];
+    if (content.type !== 'text') {
+      return null;
+    }
+
+    let jsonText = content.text.trim();
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+
+    const extracted = extractJsonObject(jsonText) || jsonText;
+    const rewrite = JSON.parse(extracted) as MemeRewrite;
+
+    if (!rewrite.memePremise || !rewrite.setup || !rewrite.punchline) {
+      return null;
+    }
+
+    return rewrite;
+  } catch {
+    return null;
+  }
+}
+
 async function tryMatchWithPrompt(
   tweet: string,
   templates: MemeTemplate[],
   feedback?: string,
   previousIds?: string[],
-  options: { maxTemplates?: number; compact?: boolean } = {}
+  options: { maxTemplates?: number; compact?: boolean; rewrite?: MemeRewrite | null } = {}
 ): Promise<MemeMatch[] | null> {
-  const { maxTemplates = 150, compact = false } = options;
+  const { maxTemplates = 150, compact = false, rewrite = null } = options;
   const templateDescriptions = getTemplateDescriptions(templates, {
     maxTemplates,
     excludeIds: previousIds,
@@ -139,11 +213,15 @@ async function tryMatchWithPrompt(
     ? `\n\nUser feedback on previous suggestions: "${feedback}". Take this into account when selecting new memes.`
     : '';
 
+  const rewriteClause = rewrite
+    ? `\nMeme-ready rewrite: "${rewrite.memePremise}"\nSuggested setup: "${rewrite.setup}"\nSuggested punchline: "${rewrite.punchline}"\nTone: ${rewrite.tone}\nTags: ${rewrite.tags?.join(', ') || ''}\n`
+    : '';
+
   const prompt = compact
     ? `You are a meme expert. Pick the 3 funniest meme templates for the tweet below.
 
 Tweet: "${tweet}"
-${feedbackClause}${excludeClause}
+${rewriteClause}${feedbackClause}${excludeClause}
 
 Available templates:
 ${templateDescriptions}
@@ -172,7 +250,7 @@ Return ONLY a JSON array with exactly 3 items:
 
 ## THE TWEET TO MEME-IFY:
 "${tweet}"
-${feedbackClause}${excludeClause}
+${rewriteClause}${feedbackClause}${excludeClause}
 
 ## AVAILABLE MEME TEMPLATES:
 ${templateDescriptions}
@@ -297,36 +375,70 @@ export async function matchTweetToMemes(
   feedback?: string,
   previousIds?: string[]
 ): Promise<MatchResult> {
-  // First attempt: try with original tweet
-  console.log('Attempting match with original tweet...');
-  const firstAttempt = await tryMatchWithPrompt(tweet, templates, feedback, previousIds);
+  const rewrite = await rewriteTweetForMeme(tweet);
+  const primaryTweet = rewrite?.memePremise || tweet;
+  const rewriteMessage = rewrite
+    ? `We rewrote your tweet to improve meme fit: "${rewrite.memePremise}"`
+    : undefined;
+
+  // First attempt: try with rewritten meme premise (if available)
+  console.log('Attempting match with meme-ready rewrite...');
+  const firstAttempt = await tryMatchWithPrompt(
+    primaryTweet,
+    templates,
+    feedback,
+    previousIds,
+    { rewrite }
+  );
 
   if (firstAttempt && firstAttempt.length >= 1) {
     return {
       matches: firstAttempt,
-      modified: false,
+      modified: Boolean(rewrite) && primaryTweet !== tweet,
+      modifiedTweet: rewrite?.memePremise,
+      message: rewriteMessage,
     };
   }
 
   // Retry with a smaller template set + compact prompt to avoid formatting issues
   const retryAttempt = await tryMatchWithPrompt(
-    tweet,
+    primaryTweet,
     templates,
     feedback,
     previousIds,
-    { maxTemplates: 90, compact: true }
+    { maxTemplates: 90, compact: true, rewrite }
   );
 
   if (retryAttempt && retryAttempt.length >= 1) {
     return {
       matches: retryAttempt,
-      modified: false,
+      modified: Boolean(rewrite) && primaryTweet !== tweet,
+      modifiedTweet: rewrite?.memePremise,
+      message: rewriteMessage,
     };
+  }
+
+  // If rewrite failed to match, try original tweet directly
+  if (rewrite && primaryTweet !== tweet) {
+    const originalAttempt = await tryMatchWithPrompt(
+      tweet,
+      templates,
+      feedback,
+      previousIds,
+      { maxTemplates: 120 }
+    );
+
+    if (originalAttempt && originalAttempt.length >= 1) {
+      return {
+        matches: originalAttempt,
+        modified: false,
+      };
+    }
   }
 
   // Second attempt: simplify the tweet and try again
   console.log('First attempt failed, trying with simplified tweet...');
-  const simplified = await simplifyTweet(tweet);
+  const simplified = await simplifyTweet(primaryTweet);
 
   if (simplified) {
     const secondAttempt = await tryMatchWithPrompt(
@@ -334,7 +446,7 @@ export async function matchTweetToMemes(
       templates,
       feedback,
       previousIds,
-      { maxTemplates: 120 }
+      { maxTemplates: 120, rewrite }
     );
 
     if (secondAttempt && secondAttempt.length >= 1) {
@@ -350,8 +462,10 @@ export async function matchTweetToMemes(
   // Final fallback: return popular versatile memes
   console.log('All attempts failed, using fallback memes...');
   return {
-    matches: getFallbackMatches(templates, tweet, previousIds),
+    matches: getFallbackMatches(templates, primaryTweet, previousIds, rewrite),
     modified: true,
-    message: "We couldn't find a perfect match, so here are some versatile memes that might work. Try the feedback button for different options!",
+    message:
+      rewriteMessage ||
+      "We couldn't find a perfect match, so here are some versatile memes that might work. Try the feedback button for different options!",
   };
 }
