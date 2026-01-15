@@ -252,6 +252,14 @@ export default function MemeEditor({
     }
   };
 
+  const handleShareToTwitter = () => {
+    const tweetText = encodeURIComponent(
+      `Made this meme in 10 seconds\n\nmemes-for-tweets.vercel.app`
+    );
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
+    window.open(twitterUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto">
       <button
@@ -324,7 +332,7 @@ export default function MemeEditor({
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 mb-3">
           <button
             onClick={handleCopyToClipboard}
             className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 font-semibold
@@ -346,12 +354,12 @@ export default function MemeEditor({
             </svg>
             Copy
           </button>
-          
+
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="flex-1 py-3 px-6 bg-gradient-to-r from-green-500 to-emerald-600 
-                       text-white font-semibold rounded-xl 
+            className="flex-1 py-3 px-6 bg-gradient-to-r from-green-500 to-emerald-600
+                       text-white font-semibold rounded-xl
                        hover:from-green-600 hover:to-emerald-700 transition-all
                        disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed
                        flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
@@ -381,6 +389,18 @@ export default function MemeEditor({
             )}
           </button>
         </div>
+
+        <button
+          onClick={handleShareToTwitter}
+          className="w-full py-3 px-6 bg-black text-white font-semibold
+                     rounded-xl hover:bg-gray-800 transition-colors
+                     flex items-center justify-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+          Share to X
+        </button>
       </div>
     </div>
   );
