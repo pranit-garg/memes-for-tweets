@@ -353,7 +353,7 @@ function generateHardcodedFallback(
       selected.push({
         id: t.id,
         name: t.name,
-        format: 'top-bottom' as const,
+        format: 'reaction' as const,
         topTransform: (tw: string) => truncate(tw, 50),
         bottomTransform: () => 'Me, trying my best',
       });
