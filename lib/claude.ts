@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { MemeTemplate, getMemeFormatInfo, MEME_FORMAT_DATABASE } from './imgflip';
+import { MemeTemplate, getMemeFormatInfo, MEME_FORMAT_DATABASE, scoreTemplates, getTopScoredTemplates, type ScoringInput } from './imgflip';
 
 let anthropicInstance: Anthropic | null = null;
 
@@ -229,8 +229,273 @@ function extractJson(text: string): unknown | null {
   }
 }
 
-// Single, robust matching function - now uses pre-computed analysis
+// MM-003: Step 1 - Select best template IDs
+async function selectBestTemplates(
+  tweet: string,
+  templates: MemeTemplate[],
+  analysis: TweetAnalysis,
+  excludeIds: string[] = [],
+  count: number = 3
+): Promise<string[]> {
+  const templateList = templates
+    .filter(t => !excludeIds.includes(t.id))
+    .map(t => {
+      const info = getMemeFormatInfo(t);
+      return `${t.id}: ${t.name} (${info.format}) - ${info.bestFor}`;
+    })
+    .join('\n');
+
+  const prompt = `Select the ${count} BEST meme templates for this tweet.
+
+TWEET: "${tweet}"
+
+ANALYSIS:
+- Humor: ${analysis.humorType}
+- Sentiment: ${analysis.sentiment}
+- Core point: ${analysis.corePoint}
+- Has comparison: ${analysis.hasTwoAlternatives}
+- Has obvious outcome: ${analysis.hasObviousOutcome}
+- Self-sabotage: ${analysis.isSelfSabotage}
+
+RULES:
+- ONLY comparison memes (Drake, Tuxedo Pooh) if tweet has TWO alternatives
+- Surprised Pikachu ONLY for obvious cause→effect
+- Match the humor type to the template
+
+TEMPLATES:
+${templateList}
+
+Reply with ONLY a JSON array of ${count} template IDs:
+["id1", "id2", "id3"]`;
+
+  try {
+    const response = await getAnthropic().messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 200,
+      temperature: 0.5,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type === 'text') {
+      const parsed = extractJson(content.text);
+      if (Array.isArray(parsed) && parsed.every(id => typeof id === 'string')) {
+        console.log('Selected templates:', parsed);
+        return parsed.slice(0, count);
+      }
+    }
+  } catch (error) {
+    console.error('Template selection failed:', error);
+  }
+
+  // Fallback: return top-scored template IDs
+  return templates.slice(0, count).map(t => t.id);
+}
+
+// MM-003: Step 2 - Generate captions for selected templates
+async function generateCaptions(
+  tweet: string,
+  selectedTemplates: MemeTemplate[],
+  analysis: TweetAnalysis
+): Promise<MemeMatch[]> {
+  const templateDetails = selectedTemplates.map(t => {
+    const info = getMemeFormatInfo(t);
+    const examples = info.exampleCaptions?.join(' | ') || 'None';
+    return `Template: ${t.name} (ID: ${t.id})
+Format: ${info.format}
+How it works: ${info.description}
+Example captions: ${examples}`;
+  }).join('\n\n');
+
+  const prompt = `Generate perfect captions for these meme templates.
+
+TWEET: "${tweet}"
+Core point: "${analysis.corePoint}"
+Humor type: ${analysis.humorType}
+
+${templateDetails}
+
+CAPTION RULES:
+1. MAX 6-8 words per text box
+2. NO "Me:", "When you...", "POV:", "Nobody:"
+3. Transform the tweet's IDEA - don't copy words
+4. Make it FUNNY and PUNCHY
+5. Each meme should feel fresh and creative
+
+Return JSON array:
+[
+  {
+    "templateId": "exact ID",
+    "templateName": "name",
+    "reasoning": "Why this works for the humor type",
+    "suggestedTopText": "punchy top text",
+    "suggestedBottomText": "punchy bottom text"
+  }
+]`;
+
+  try {
+    const response = await getAnthropic().messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      temperature: 0.8,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type === 'text') {
+      const parsed = extractJson(content.text);
+      if (Array.isArray(parsed)) {
+        return parsed.map(m => {
+          const template = selectedTemplates.find(t => t.id === m.templateId);
+          const formatInfo = template ? getMemeFormatInfo(template) : null;
+          return {
+            templateId: m.templateId,
+            templateName: m.templateName || template?.name || 'Meme',
+            reasoning: m.reasoning || 'Great match',
+            suggestedTopText: String(m.suggestedTopText || '').slice(0, 100),
+            suggestedBottomText: String(m.suggestedBottomText || '').slice(0, 100),
+            format: formatInfo?.format || 'top-bottom',
+            textBoxes: [
+              { position: 'top', text: String(m.suggestedTopText || '').slice(0, 100) },
+              { position: 'bottom', text: String(m.suggestedBottomText || '').slice(0, 100) },
+            ],
+          };
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Caption generation failed:', error);
+  }
+
+  return [];
+}
+
+// MM-004: Self-critique and refine matches
+async function critiqueAndRefine(
+  tweet: string,
+  matches: MemeMatch[],
+  analysis: TweetAnalysis,
+  templates: MemeTemplate[]
+): Promise<MemeMatch[]> {
+  if (matches.length === 0) return matches;
+
+  const matchesSummary = matches.map(m => 
+    `${m.templateName}: "${m.suggestedTopText}" / "${m.suggestedBottomText}"`
+  ).join('\n');
+
+  const prompt = `Critique these meme matches and fix any problems.
+
+TWEET: "${tweet}"
+Analysis: ${analysis.humorType} humor, ${analysis.sentiment} sentiment
+
+CURRENT MATCHES:
+${matchesSummary}
+
+CRITIQUE CHECKLIST:
+1. Is text TOO LONG (>8 words)? → Shorten it
+2. Is text GENERIC ("Me:", "When you", "POV")? → Make it specific
+3. Does the meme FORMAT match the tweet structure?
+   - Comparison memes need TWO alternatives
+   - Reaction memes need a cause→effect
+4. Is the caption ACTUALLY FUNNY?
+
+If ALL matches are good, reply: {"approved": true}
+
+If ANY match needs fixing, reply with the FIXED version:
+{
+  "approved": false,
+  "fixes": [
+    {"templateId": "id", "newTopText": "fixed", "newBottomText": "fixed", "issue": "what was wrong"}
+  ]
+}`;
+
+  try {
+    const response = await getAnthropic().messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 800,
+      temperature: 0.3,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type === 'text') {
+      const parsed = extractJson(content.text) as { approved?: boolean; fixes?: Array<{templateId: string; newTopText: string; newBottomText: string; issue: string}> } | null;
+      
+      if (parsed?.approved) {
+        console.log('MM-004: Matches approved by self-critique');
+        return matches;
+      }
+
+      if (parsed?.fixes && Array.isArray(parsed.fixes)) {
+        console.log('MM-004: Applying fixes:', parsed.fixes.map(f => f.issue).join(', '));
+        return matches.map(match => {
+          const fix = parsed.fixes?.find(f => f.templateId === match.templateId);
+          if (fix) {
+            return {
+              ...match,
+              suggestedTopText: fix.newTopText || match.suggestedTopText,
+              suggestedBottomText: fix.newBottomText || match.suggestedBottomText,
+              textBoxes: [
+                { position: 'top', text: fix.newTopText || match.suggestedTopText },
+                { position: 'bottom', text: fix.newBottomText || match.suggestedBottomText },
+              ],
+            };
+          }
+          return match;
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Self-critique failed:', error);
+  }
+
+  return matches;
+}
+
+// Main two-step matching function with critique
 async function generateMemeMatches(
+  tweet: string,
+  templates: MemeTemplate[],
+  analysis: TweetAnalysis,
+  excludeIds: string[] = [],
+  feedback?: string
+): Promise<MemeMatch[] | null> {
+  const feedbackNote = feedback ? ` (User wants: ${feedback})` : '';
+  
+  console.log('MM-003 Step 1: Selecting templates...');
+  const selectedIds = await selectBestTemplates(
+    tweet + feedbackNote, 
+    templates, 
+    analysis, 
+    excludeIds, 
+    3
+  );
+  
+  const selectedTemplates = selectedIds
+    .map(id => templates.find(t => t.id === id))
+    .filter((t): t is MemeTemplate => t !== undefined);
+  
+  if (selectedTemplates.length === 0) {
+    console.log('No templates selected, using fallback');
+    return null;
+  }
+
+  console.log('MM-003 Step 2: Generating captions...');
+  let matches = await generateCaptions(tweet, selectedTemplates, analysis);
+  
+  if (matches.length === 0) {
+    console.log('Caption generation failed');
+    return null;
+  }
+
+  console.log('MM-004: Running self-critique...');
+  matches = await critiqueAndRefine(tweet, matches, analysis, templates);
+
+  return matches.length > 0 ? matches : null;
+}
+
+// Legacy function for compatibility (deprecated)
+async function generateMemeMatchesLegacy(
   tweet: string,
   templates: MemeTemplate[],
   analysis: TweetAnalysis,
@@ -320,7 +585,7 @@ Return exactly 3 memes that match the analyzed humor type. Quality over generic 
 
     console.log('Claude response received');
     console.log('Response content type:', response.content[0]?.type);
-    
+
     const content = response.content[0];
     if (content.type !== 'text') {
       console.error('Non-text response from Claude');
@@ -691,9 +956,28 @@ export async function matchTweetToMemes(
   const analysis = await analyzeTweet(tweet);
   console.log('Analysis complete:', analysis.humorType, analysis.sentiment);
 
-  // Second: match using the analysis
-  console.log('Step 2: Matching with analysis context...');
-  const matches = await generateMemeMatches(tweet, templates, analysis, excludeIds, feedback);
+  // MM-002: Score all templates based on the analysis
+  console.log('Step 2: Scoring templates...');
+  const scoringInput: ScoringInput = {
+    humorType: analysis.humorType,
+    secondaryHumorType: analysis.secondaryHumorType,
+    hasTwoAlternatives: analysis.hasTwoAlternatives,
+    hasObviousOutcome: analysis.hasObviousOutcome,
+    isSelfSabotage: analysis.isSelfSabotage,
+    sentiment: analysis.sentiment,
+  };
+  
+  // Get top 20 scored templates (filtered by excludeIds)
+  const filteredTemplates = templates.filter(t => !excludeIds.includes(t.id));
+  const topTemplates = getTopScoredTemplates(filteredTemplates, scoringInput, 20);
+  
+  // Log top 5 scores for debugging
+  const topScores = scoreTemplates(filteredTemplates, scoringInput).slice(0, 5);
+  console.log('Top 5 template scores:', topScores.map(s => `${s.templateName}: ${s.score}`).join(', '));
+
+  // Step 3: Use AI to select and generate captions from top-scored templates
+  console.log('Step 3: AI selecting from top-scored templates...');
+  const matches = await generateMemeMatches(tweet, topTemplates, analysis, excludeIds, feedback);
   
   if (matches && matches.length > 0) {
     console.log('Primary matching succeeded');

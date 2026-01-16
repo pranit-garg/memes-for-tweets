@@ -7,6 +7,22 @@ export interface MemeTemplate {
   box_count: number;
 }
 
+// MM-002 & MM-005: Humor type categories for template scoring
+export type MemeHumorTag = 
+  | 'sarcasm' 
+  | 'irony' 
+  | 'hot-take' 
+  | 'complaint' 
+  | 'self-deprecation' 
+  | 'observation' 
+  | 'flex' 
+  | 'roast' 
+  | 'absurdist' 
+  | 'wholesome'
+  | 'comparison'
+  | 'nostalgia'
+  | 'relatable';
+
 // Detailed meme format info for better AI matching
 export interface MemeFormatInfo {
   id: string;
@@ -15,6 +31,8 @@ export interface MemeFormatInfo {
   format: 'top-bottom' | 'multi-panel' | 'reaction' | 'comparison' | 'label';
   description: string;
   bestFor: string;
+  humorTags?: MemeHumorTag[];  // MM-005: Optional humor tags
+  exampleCaptions?: string[]; // MM-006: Example captions for few-shot learning
   textBoxes: Array<{
     position: 'top' | 'bottom' | 'left' | 'right' | 'center' | 'panel1' | 'panel2' | 'panel3' | 'panel4';
     purpose: string;
@@ -22,7 +40,7 @@ export interface MemeFormatInfo {
 }
 
 // Curated meme database with format context for better matching
-// MASSIVE library for better AI matching
+// MASSIVE library for better AI matching - MM-005/MM-006: Now with humorTags and exampleCaptions
 export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'name'>> = {
   // === COMPARISON MEMES (A vs B, preferences) ===
   '181913649': { // Drake Hotline Bling
@@ -30,6 +48,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Drake disapproving something (top), then approving alternative (bottom)',
     bestFor: 'Showing preference, rejecting one thing for another, ONLY when tweet has two alternatives to compare',
+    humorTags: ['comparison'],
+    exampleCaptions: ['Top: Reading documentation / Bottom: Asking ChatGPT', 'Top: Going to the gym / Bottom: Buying new workout clothes'],
     textBoxes: [
       { position: 'top', purpose: 'Thing being rejected/disliked' },
       { position: 'bottom', purpose: 'Thing being preferred/approved' },
@@ -40,6 +60,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Regular Pooh vs Fancy Pooh',
     bestFor: 'Fancier/pretentious way of saying the SAME thing, upgrades, sophistication',
+    humorTags: ['comparison', 'sarcasm'],
+    exampleCaptions: ['Top: Nap / Bottom: Horizontal life pause', 'Top: Bug / Bottom: Undocumented feature'],
     textBoxes: [
       { position: 'top', purpose: 'Normal/basic version' },
       { position: 'bottom', purpose: 'Fancy/elevated version' },
@@ -50,6 +72,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Strong doge (past) vs weak doge (present)',
     bestFor: 'Then vs now comparisons, things getting worse over time, nostalgia about how things used to be better',
+    humorTags: ['comparison', 'nostalgia', 'self-deprecation'],
+    exampleCaptions: ['Left: Devs in 2010 / Right: Devs asking AI to write a for loop', 'Left: Ancient philosophers / Right: Me deciding what to eat'],
     textBoxes: [
       { position: 'left', purpose: 'How things were (strong)' },
       { position: 'right', purpose: 'How things are now (weak)' },
@@ -60,6 +84,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Person sweating while choosing between two buttons',
     bestFor: 'Impossible choices, dilemmas, when BOTH options are tempting or terrible',
+    humorTags: ['relatable', 'absurdist', 'self-deprecation'],
+    exampleCaptions: ['Button 1: Sleep / Button 2: One more episode / Guy: Me at 2am'],
     textBoxes: [
       { position: 'panel1', purpose: 'First option (button)' },
       { position: 'panel2', purpose: 'Second option (button)' },
@@ -71,6 +97,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Guy looking at another woman while girlfriend looks disapprovingly',
     bestFor: 'Being distracted by something shiny/new, abandoning responsibilities, temptation pulling away from duties',
+    humorTags: ['comparison', 'relatable', 'self-deprecation'],
+    exampleCaptions: ['GF: My responsibilities / Me / Other woman: New side project'],
     textBoxes: [
       { position: 'left', purpose: 'Current thing being neglected (girlfriend)' },
       { position: 'center', purpose: 'Who/what is being distracted (boyfriend)' },
@@ -82,6 +110,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Two arms doing epic handshake, united by common ground',
     bestFor: 'Two different groups agreeing on something, unlikely allies, finding common ground between opposites',
+    humorTags: ['observation', 'relatable', 'wholesome'],
+    exampleCaptions: ['Left: Frontend devs / Right: Backend devs / Hands: Blaming QA'],
     textBoxes: [
       { position: 'left', purpose: 'First group/person' },
       { position: 'center', purpose: 'What they agree on (handshake)' },
@@ -93,6 +123,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'UNO card: do X or draw 25 cards',
     bestFor: 'Refusing to do something reasonable/easy, extreme stubbornness, irrational choices',
+    humorTags: ['sarcasm', 'self-deprecation', 'relatable'],
+    exampleCaptions: ['Card: Admit you were wrong / Guy holding 25 cards: Me'],
     textBoxes: [
       { position: 'top', purpose: 'Reasonable thing to do' },
       { position: 'bottom', purpose: 'Who refuses to do it' },
@@ -116,6 +148,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Pikachu with shocked face',
     bestFor: 'ONLY for predictable outcomes - "does X" → "X happens" → shocked. The outcome must be OBVIOUS from the action',
+    humorTags: ['irony', 'sarcasm'],
+    exampleCaptions: ['Top: Eats entire pizza / Bottom: Gets stomachache', 'Top: Skips all tests / Bottom: Code breaks in prod'],
     textBoxes: [
       { position: 'top', purpose: 'Action with obvious consequence' },
       { position: 'bottom', purpose: 'The obvious consequence happens' },
@@ -126,6 +160,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Astronaut realizing truth, other astronaut with gun saying "Always has been"',
     bestFor: 'Revealing something was ALWAYS true, not a recent change. "Wait X is Y?" "Always has been"',
+    humorTags: ['irony', 'observation'],
+    exampleCaptions: ['Top: Wait, meetings are just emails? / Bottom: Always has been'],
     textBoxes: [
       { position: 'top', purpose: 'The realization/question "Wait, its all X?"' },
       { position: 'bottom', purpose: '"Always has been" confirmation' },
@@ -217,6 +253,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Person puts stick in own bike wheel and falls',
     bestFor: 'Self-sabotage, causing your own problems then blaming others, ironic self-destruction',
+    humorTags: ['self-deprecation', 'irony'],
+    exampleCaptions: ['Panel 1: Me / Panel 2: Not studying / Panel 3: Why am I failing?'],
     textBoxes: [
       { position: 'panel1', purpose: 'Action causing the problem' },
       { position: 'panel2', purpose: 'The self-sabotage' },
@@ -228,6 +266,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Dog sitting in burning room saying "This is fine"',
     bestFor: 'Ignoring obvious problems, denial in crisis, pretending everything is okay when its not',
+    humorTags: ['sarcasm', 'relatable'],
+    exampleCaptions: ['Top: 47 unread emails / Bottom: This is fine'],
     textBoxes: [
       { position: 'top', purpose: 'The disaster/problem' },
       { position: 'bottom', purpose: '"This is fine" / acceptance' },
@@ -825,6 +865,7 @@ export function getMemeFormatInfo(template: MemeTemplate): MemeFormatInfo {
       id: template.id,
       name: template.name,
       ...formatData,
+      humorTags: formatData.humorTags || ['observation'], // Default if not specified
     };
   }
   
@@ -836,6 +877,7 @@ export function getMemeFormatInfo(template: MemeTemplate): MemeFormatInfo {
     format: template.box_count === 1 ? 'label' : 'top-bottom',
     description: `${template.name} meme template`,
     bestFor: 'General meme usage',
+    humorTags: ['observation'], // Default humor tag
     textBoxes: template.box_count === 1 
       ? [{ position: 'center', purpose: 'Main text' }]
       : [
@@ -843,6 +885,113 @@ export function getMemeFormatInfo(template: MemeTemplate): MemeFormatInfo {
           { position: 'bottom', purpose: 'Punchline or second part' },
         ],
   };
+}
+
+// MM-002: Template Scoring System
+export interface TemplateScore {
+  templateId: string;
+  templateName: string;
+  score: number;
+  matchReasons: string[];
+}
+
+export interface ScoringInput {
+  humorType: string;
+  secondaryHumorType?: string;
+  hasTwoAlternatives: boolean;
+  hasObviousOutcome: boolean;
+  isSelfSabotage: boolean;
+  sentiment: string;
+}
+
+export function scoreTemplates(
+  templates: MemeTemplate[],
+  input: ScoringInput
+): TemplateScore[] {
+  const scores: TemplateScore[] = [];
+
+  for (const template of templates) {
+    const formatInfo = getMemeFormatInfo(template);
+    let score = 0;
+    const reasons: string[] = [];
+
+    // Score based on humor tag match (primary)
+    if (formatInfo.humorTags?.includes(input.humorType as MemeHumorTag)) {
+      score += 30;
+      reasons.push(`Matches primary humor: ${input.humorType}`);
+    }
+
+    // Score based on secondary humor type
+    if (input.secondaryHumorType && formatInfo.humorTags?.includes(input.secondaryHumorType as MemeHumorTag)) {
+      score += 15;
+      reasons.push(`Matches secondary humor: ${input.secondaryHumorType}`);
+    }
+
+    // Comparison memes need two alternatives
+    if (formatInfo.format === 'comparison') {
+      if (input.hasTwoAlternatives) {
+        score += 25;
+        reasons.push('Tweet has two alternatives for comparison');
+      } else {
+        score -= 40; // Heavy penalty for comparison memes without alternatives
+        reasons.push('PENALTY: No alternatives to compare');
+      }
+    }
+
+    // Reaction memes for obvious outcomes
+    if (formatInfo.format === 'reaction' && input.hasObviousOutcome) {
+      score += 20;
+      reasons.push('Obvious outcome fits reaction format');
+    }
+
+    // Bike Fall and self-deprecation memes
+    if (input.isSelfSabotage) {
+      if (template.id === '79132341') { // Bike Fall
+        score += 35;
+        reasons.push('Perfect for self-sabotage (Bike Fall)');
+      } else if (formatInfo.humorTags?.includes('self-deprecation')) {
+        score += 20;
+        reasons.push('Self-deprecation meme fits self-sabotage');
+      }
+    }
+
+    // Sentiment-based bonuses
+    if (input.sentiment === 'sarcastic' && formatInfo.humorTags?.includes('sarcasm')) {
+      score += 15;
+      reasons.push('Sarcastic sentiment matches meme');
+    }
+    if (input.sentiment === 'negative' && formatInfo.humorTags?.includes('complaint')) {
+      score += 15;
+      reasons.push('Negative sentiment fits complaint meme');
+    }
+
+    // Curated meme bonus (we have better info on these)
+    if (MEME_FORMAT_DATABASE[template.id]) {
+      score += 10;
+      reasons.push('Curated template with rich metadata');
+    }
+
+    scores.push({
+      templateId: template.id,
+      templateName: template.name,
+      score,
+      matchReasons: reasons,
+    });
+  }
+
+  // Sort by score descending
+  return scores.sort((a, b) => b.score - a.score);
+}
+
+// Get top-scoring templates for a given analysis
+export function getTopScoredTemplates(
+  templates: MemeTemplate[],
+  input: ScoringInput,
+  limit: number = 15
+): MemeTemplate[] {
+  const scored = scoreTemplates(templates, input);
+  const topIds = scored.slice(0, limit).map(s => s.templateId);
+  return templates.filter(t => topIds.includes(t.id));
 }
 
 // Get rich template descriptions for LLM matching

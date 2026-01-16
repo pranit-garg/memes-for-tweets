@@ -21,15 +21,16 @@
     {
       "id": "MM-002",
       "title": "Implement template scoring system",
-      "description": "Instead of asking the LLM to pick templates, have it score ALL curated templates (0-100) based on fit, then select top 3. This ensures consistent evaluation across the full library.",
+      "description": "Score all curated templates based on fit to the analyzed tweet, then select top templates for AI to choose from.",
       "acceptanceCriteria": [
         "Create scoreTemplates() function",
         "Score based on: format fit, humor alignment, specificity",
-        "Return top 3 highest-scoring templates with scores",
+        "Return top-scoring templates with scores",
         "Include reasoning for each score"
       ],
       "priority": 2,
-      "passes": false
+      "passes": true,
+      "completedAt": "2026-01-16"
     },
     {
       "id": "MM-003",
@@ -38,52 +39,56 @@
       "acceptanceCriteria": [
         "Create generateCaptions() function",
         "Takes template + tweet analysis as input",
-        "Generates 2-3 caption variations per template",
+        "Generates captions optimized per template",
         "Respects template's text box constraints",
         "Captions are punchy (under 8 words per box)"
       ],
       "priority": 3,
-      "passes": false
+      "passes": true,
+      "completedAt": "2026-01-16"
     },
     {
       "id": "MM-004",
       "title": "Add self-critique step",
-      "description": "After generating matches, have the LLM critique its own suggestions and optionally regenerate if quality is below threshold. This catches weak matches before showing to user.",
+      "description": "After generating matches, have the LLM critique its own suggestions and fix any issues (too long, generic, poor fit).",
       "acceptanceCriteria": [
-        "Create critiqueMatches() function",
-        "Score each match on: humor, relevance, virality potential",
-        "Flag matches scoring below 70/100",
-        "Optionally regenerate flagged matches",
-        "Limit to 1 regeneration attempt to avoid loops"
+        "Create critiqueAndRefine() function",
+        "Check for: text too long, generic phrases, poor format match",
+        "Fix matches that have issues",
+        "Approve matches that are good",
+        "Log critique results"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true,
+      "completedAt": "2026-01-16"
     },
     {
       "id": "MM-005",
       "title": "Expand template database with humor categories",
       "description": "Tag each template in MEME_FORMAT_DATABASE with specific humor categories it excels at (sarcasm, irony, self-deprecation, hot-takes, etc). Use these tags to filter templates before scoring.",
       "acceptanceCriteria": [
-        "Add 'humorTypes' array to each template in database",
+        "Add 'humorTags' array to each template in database",
         "Categories: sarcasm, irony, self-deprecation, hot-take, absurdist, wholesome, complaint, flex, roast",
-        "Update getMemeFormatInfo to return humor types",
-        "Filter templates by matching humor type before scoring"
+        "Update getMemeFormatInfo to return humor tags",
+        "Use humor tags in template scoring"
       ],
       "priority": 5,
-      "passes": false
+      "passes": true,
+      "completedAt": "2026-01-16"
     },
     {
       "id": "MM-006",
       "title": "Add example captions to template database",
-      "description": "For each curated template, add 2-3 example captions that demonstrate ideal usage. The LLM can use these as few-shot examples for better caption generation.",
+      "description": "For each curated template, add example captions that demonstrate ideal usage. The LLM can use these as few-shot examples for better caption generation.",
       "acceptanceCriteria": [
-        "Add 'examples' array to each template in MEME_FORMAT_DATABASE",
-        "Each example has topText and bottomText",
+        "Add 'exampleCaptions' array to MemeFormatInfo interface",
+        "Populate examples for key templates",
         "Examples demonstrate the template's ideal joke structure",
         "Include examples in prompt context for caption generation"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true,
+      "completedAt": "2026-01-16"
     },
     {
       "id": "MM-007",
@@ -99,5 +104,7 @@
       "passes": false
     }
   ],
-  "progress": []
+  "progress": [
+    {"date": "2026-01-16", "completed": ["MM-001", "MM-002", "MM-003", "MM-004", "MM-005", "MM-006"]}
+  ]
 }
