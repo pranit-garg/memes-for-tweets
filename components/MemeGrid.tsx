@@ -15,7 +15,6 @@ interface MemeGridProps {
   selectedId?: string;
 }
 
-// Component to render meme preview with text overlay
 function MemePreview({ match }: { match: EnrichedMatch }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -31,34 +30,27 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
     img.crossOrigin = 'anonymous';
 
     img.onload = () => {
-      // Set canvas size - square aspect for grid
       const size = 300;
       canvas.width = size;
       canvas.height = size;
 
-      // Calculate scaling to fit image in square
       const scale = Math.min(size / img.width, size / img.height);
       const scaledWidth = img.width * scale;
       const scaledHeight = img.height * scale;
       const offsetX = (size - scaledWidth) / 2;
       const offsetY = (size - scaledHeight) / 2;
 
-      // Clear and fill background
-      ctx.fillStyle = '#f3f4f6';
+      ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(0, 0, size, size);
-
-      // Draw image centered
       ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
 
-      // Configure text style - SMALL font for thumbnails to not obscure image
       const fontSize = Math.max(10, Math.min(13, size / 24));
-      ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
+      ctx.font = `bold ${fontSize}px Impact, 'Arial Black', sans-serif`;
       ctx.textAlign = 'center';
 
-      const padding = 2; // Minimal padding - absolute edge
+      const padding = 2;
       const maxTextWidth = size - padding * 2;
 
-      // Helper to wrap text - more aggressive for thumbnails
       const wrapText = (text: string, maxWidth: number): string[] => {
         const words = text.split(' ');
         const lines: string[] = [];
@@ -66,24 +58,17 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
 
         for (const word of words) {
           const testLine = currentLine ? `${currentLine} ${word}` : word;
-          const metrics = ctx.measureText(testLine);
-
-          if (metrics.width > maxWidth && currentLine) {
+          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
             lines.push(currentLine);
             currentLine = word;
           } else {
             currentLine = testLine;
           }
         }
-
-        if (currentLine) {
-          lines.push(currentLine);
-        }
-
-        return lines.slice(0, 2); // Max 2 lines for preview
+        if (currentLine) lines.push(currentLine);
+        return lines.slice(0, 2);
       };
 
-      // Helper to draw meme text with outline at ABSOLUTE edges
       const drawMemeText = (text: string, y: number, isTop: boolean) => {
         const lines = wrapText(text.toUpperCase(), maxTextWidth);
         const lineHeight = fontSize * 1.05;
@@ -93,32 +78,24 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
             ? y + index * lineHeight
             : y - (lines.length - 1 - index) * lineHeight;
 
-          // Draw thick black outline
           ctx.strokeStyle = 'black';
           ctx.lineWidth = fontSize * 0.18;
           ctx.lineJoin = 'round';
-          ctx.miterLimit = 2;
           for (let i = 0; i < 3; i++) {
             ctx.strokeText(line, size / 2, lineY);
           }
-
-          // Draw white fill
           ctx.fillStyle = 'white';
           ctx.fillText(line, size / 2, lineY);
         });
       };
 
-      // Get text from textBoxes or fallback to top/bottom
       const topText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
       const bottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
 
-      // Draw top text at ABSOLUTE TOP - minimal offset from edge
       if (topText) {
         ctx.textBaseline = 'top';
         drawMemeText(topText, padding, true);
       }
-
-      // Draw bottom text at ABSOLUTE BOTTOM
       if (bottomText) {
         ctx.textBaseline = 'bottom';
         drawMemeText(bottomText, size - padding, false);
@@ -128,12 +105,11 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
     };
 
     img.onerror = () => {
-      // Draw placeholder on error
       canvas.width = 300;
       canvas.height = 300;
-      ctx.fillStyle = '#e5e7eb';
+      ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(0, 0, 300, 300);
-      ctx.fillStyle = '#9ca3af';
+      ctx.fillStyle = '#666';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -145,7 +121,7 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
   }, [match]);
 
   return (
-    <div className="relative w-full aspect-square overflow-hidden bg-gray-100">
+    <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-[var(--bg-secondary)]">
       <canvas
         ref={canvasRef}
         className={`w-full h-full object-contain transition-opacity duration-200 ${
@@ -154,7 +130,7 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       />
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-8 h-8 border-4 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
         </div>
       )}
     </div>
@@ -166,41 +142,30 @@ export default function MemeGrid({
   onSelect,
   selectedId,
 }: MemeGridProps) {
-  if (matches.length === 0) {
-    return null;
-  }
+  if (matches.length === 0) return null;
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h2 className="impact-text text-3xl text-[#FFD700] meme-shadow">
-          🎉 PICK UR MEME 🎉
-        </h2>
-        <p className="text-white/70 text-sm mt-1">click one 2 customize it</p>
-      </div>
+      <h2 className="text-lg font-medium text-[var(--text-secondary)] mb-4 text-center">
+        Pick a template
+      </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {matches.map((match, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {matches.map((match) => (
           <button
             key={match.templateId}
             onClick={() => onSelect(match)}
-            className={`rage-box card-hover p-0 overflow-hidden
-                       ${selectedId === match.templateId ? 'ring-4 ring-[#FFD700]' : ''}`}
+            className={`card p-0 overflow-hidden text-left transition-all
+                       hover:border-[var(--accent)]/50 hover:scale-[1.02]
+                       ${selectedId === match.templateId ? 'ring-2 ring-[var(--accent)]' : ''}`}
           >
-            {/* Number badge */}
-            <div className="absolute top-2 left-2 z-10 w-8 h-8 bg-[#FF4444] border-2 border-black flex items-center justify-center">
-              <span className="impact-text text-white text-lg">{index + 1}</span>
-            </div>
-            
             <MemePreview match={match} />
 
-            {/* Info bar */}
-            <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] p-3 border-t-4 border-black">
-              <h3 className="font-bold text-[#FFD700] text-sm truncate mb-1">
+            <div className="p-3 border-t border-[var(--border)]">
+              <h3 className="font-medium text-white text-sm truncate">
                 {match.templateName}
               </h3>
-              <p className="text-xs text-white/60 line-clamp-2">
+              <p className="text-xs text-[var(--text-muted)] line-clamp-2 mt-1">
                 {match.reasoning}
               </p>
             </div>

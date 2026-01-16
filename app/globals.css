@@ -1,224 +1,160 @@
 @import "tailwindcss";
 
-/* EARLY MEME ERA AESTHETIC (2007-2012) */
-/* Think rage comics, Web 2.0 glossy buttons, chaotic internet energy */
+/* MODERN MEME ERA - Clean, dark, refined */
 
 :root {
-  /* Classic meme era colors */
-  --meme-yellow: #FFD700;
-  --meme-blue: #1E90FF;
-  --meme-red: #FF4444;
-  --meme-green: #00FF00;
-  --meme-pink: #FF69B4;
-  --meme-orange: #FF8C00;
-  --meme-purple: #9932CC;
-  --meme-cyan: #00CED1;
-  
-  /* Background gradient - classic forum vibes */
-  --bg-gradient-start: #1a1a2e;
-  --bg-gradient-mid: #16213e;
-  --bg-gradient-end: #0f3460;
+  /* Dark theme palette */
+  --bg-primary: #0f0f0f;
+  --bg-secondary: #1a1a1a;
+  --bg-card: #242424;
+  --bg-hover: #2a2a2a;
   
   /* Text colors */
   --text-primary: #ffffff;
-  --text-secondary: #b0b0b0;
-  --text-accent: #FFD700;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666666;
   
-  /* Border style */
-  --border-chunky: 3px solid #000;
-}
-
-@theme inline {
-  --color-background: var(--bg-gradient-start);
-  --color-foreground: var(--text-primary);
-}
-
-/* Font imports - Comic Sans and Impact vibes */
-@font-face {
-  font-family: 'Comic Neue';
-  src: url('https://fonts.gstatic.com/s/comicneue/v8/4UaHrEJDsxBrF37olUeDx63j5pN1MwI.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
+  /* Accent - warm orange/amber */
+  --accent: #ff6b35;
+  --accent-hover: #ff8555;
+  --accent-subtle: rgba(255, 107, 53, 0.1);
+  
+  /* Success/action green */
+  --success: #10b981;
+  --success-hover: #34d399;
+  
+  /* Borders */
+  --border: #333333;
+  --border-hover: #444444;
 }
 
 body {
-  background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
-  background-attachment: fixed;
+  background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Starfield background effect */
+/* Subtle gradient overlay */
 body::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(2px 2px at 20px 30px, #fff, transparent),
-    radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
-    radial-gradient(1px 1px at 90px 40px, #fff, transparent),
-    radial-gradient(2px 2px at 130px 80px, rgba(255,255,255,0.6), transparent),
-    radial-gradient(1px 1px at 160px 120px, #fff, transparent),
-    radial-gradient(2px 2px at 200px 50px, rgba(255,255,255,0.7), transparent),
-    radial-gradient(1px 1px at 250px 160px, #fff, transparent),
-    radial-gradient(2px 2px at 300px 100px, rgba(255,255,255,0.5), transparent);
-  background-size: 350px 200px;
-  animation: twinkle 8s ease-in-out infinite alternate;
+  height: 400px;
+  background: radial-gradient(ellipse at top, rgba(255, 107, 53, 0.05) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
-  opacity: 0.4;
 }
 
-@keyframes twinkle {
-  0% { opacity: 0.3; }
-  100% { opacity: 0.5; }
+/* Card styles */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: all 0.2s ease;
 }
 
-/* Chunky meme-style text shadow */
-.meme-shadow {
-  text-shadow: 
-    2px 2px 0 #000,
-    -2px -2px 0 #000,
-    2px -2px 0 #000,
-    -2px 2px 0 #000,
-    0 2px 0 #000,
-    2px 0 0 #000,
-    0 -2px 0 #000,
-    -2px 0 0 #000;
+.card:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
 }
 
-/* Web 2.0 glossy button effect */
-.glossy-btn {
-  background: linear-gradient(180deg, 
-    rgba(255,255,255,0.3) 0%, 
-    rgba(255,255,255,0.1) 50%, 
-    rgba(0,0,0,0.1) 50%, 
-    rgba(0,0,0,0.2) 100%
-  );
-  border: 3px solid rgba(0,0,0,0.3);
-  box-shadow: 
-    0 4px 0 rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255,255,255,0.4);
-  transition: all 0.1s ease;
+/* Button styles */
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
-.glossy-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 6px 0 rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255,255,255,0.4);
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
 }
 
-.glossy-btn:active {
-  transform: translateY(2px);
-  box-shadow: 
-    0 2px 0 rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255,255,255,0.4);
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
-/* Rage comic style box */
-.rage-box {
-  background: #fff;
-  border: 4px solid #000;
-  box-shadow: 
-    6px 6px 0 #000,
-    inset 0 0 0 2px rgba(0,0,0,0.05);
+.btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-weight: 500;
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
-/* Rainbow text animation */
-@keyframes rainbow {
-  0% { color: #ff0000; }
-  14% { color: #ff8000; }
-  28% { color: #ffff00; }
-  42% { color: #00ff00; }
-  57% { color: #00ffff; }
-  71% { color: #0080ff; }
-  85% { color: #8000ff; }
-  100% { color: #ff0080; }
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
-.rainbow-text {
-  animation: rainbow 3s linear infinite;
+/* Input styles */
+.input {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
 }
 
-/* Blink animation (it's 2008 baby!) */
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
-.blink {
-  animation: blink 1s step-end infinite;
+.input::placeholder {
+  color: var(--text-muted);
 }
 
-/* Marquee-style scroll */
-@keyframes scroll-left {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-
-.scroll-text {
-  animation: scroll-left 15s linear infinite;
-}
-
-/* Pixelated image filter */
-.pixelated {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-
-/* Input focus glow */
-.glow-focus:focus {
-  box-shadow: 
-    0 0 10px var(--meme-yellow),
-    0 0 20px var(--meme-yellow),
-    0 0 30px var(--meme-orange);
-  border-color: var(--meme-yellow) !important;
-}
-
-/* Card hover effect */
-.card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card-hover:hover {
-  transform: translateY(-4px) rotate(-1deg);
-  box-shadow: 8px 8px 0 #000;
-}
-
-/* Impact font for headers */
-.impact-text {
-  font-family: Impact, 'Arial Black', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Scrollbar styling - meme era */
+/* Smooth scrollbar */
 ::-webkit-scrollbar {
-  width: 16px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
-  border: 2px solid #333;
+  background: var(--bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #FFD700, #FF8C00);
-  border: 2px solid #000;
-  border-radius: 0;
+  background: var(--border);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #FFF000, #FFD700);
+  background: var(--border-hover);
 }
 
-/* Selection color */
+/* Selection */
 ::selection {
-  background: var(--meme-yellow);
-  color: #000;
+  background: var(--accent);
+  color: white;
+}
+
+/* Pulse animation for loading */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fade-in 0.3s ease-out;
 }

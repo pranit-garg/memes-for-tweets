@@ -8,16 +8,13 @@ interface FeedbackButtonProps {
 }
 
 const feedbackOptions = [
-  { id: 'literal', label: '🤔 Too literal', description: 'I want something more clever' },
-  { id: 'tone', label: '😐 Wrong vibe', description: 'The tone is off' },
-  { id: 'obscure', label: '❓ Too obscure', description: 'I want more recognizable memes' },
-  { id: 'different', label: '🔄 Just different', description: 'Show me other options' },
+  { id: 'literal', label: 'Too literal', description: 'Want something more clever' },
+  { id: 'tone', label: 'Wrong vibe', description: 'Tone doesn\'t match' },
+  { id: 'obscure', label: 'Too niche', description: 'Need more recognizable memes' },
+  { id: 'different', label: 'Show others', description: 'Just want different options' },
 ];
 
-export default function FeedbackButton({
-  onFeedback,
-  isLoading,
-}: FeedbackButtonProps) {
+export default function FeedbackButton({ onFeedback, isLoading }: FeedbackButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSelect = (option: typeof feedbackOptions[0]) => {
@@ -30,49 +27,39 @@ export default function FeedbackButton({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
-        className="text-[#FFD700] hover:text-white text-sm font-bold
+        className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm
                    flex items-center gap-2 disabled:opacity-50 transition-colors"
       >
         {isLoading ? (
           <>
-            <div className="w-4 h-4 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
-            <span>FINDING MORE MEMES...</span>
+            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span>Finding more...</span>
           </>
         ) : (
           <>
-            <span>🔄</span>
-            <span>NOT QUITE RIGHT? TRY AGAIN</span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Not quite right? Try again</span>
           </>
         )}
       </button>
 
       {isOpen && !isLoading && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 rage-box bg-white p-0 z-10 w-72">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-[#FF4444] to-[#FF8C00] px-3 py-2 border-b-4 border-black">
-            <p className="text-white font-bold text-sm text-center">
-              😤 WHATS WRONG? 😤
-            </p>
-          </div>
-          
-          {/* Options */}
-          <div className="p-2">
-            {feedbackOptions.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => handleSelect(option)}
-                className="w-full text-left px-3 py-3 hover:bg-[#FFFACD] 
-                         transition-colors border-b-2 border-dashed border-gray-200 last:border-0"
-              >
-                <span className="font-bold text-black text-sm block">
-                  {option.label}
-                </span>
-                <span className="text-gray-600 text-xs">
-                  {option.description}
-                </span>
-              </button>
-            ))}
-          </div>
+        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 card p-1 z-10 w-52 fade-in">
+          {feedbackOptions.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => handleSelect(option)}
+              className="w-full text-left px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+            >
+              <span className="text-white text-sm block">{option.label}</span>
+              <span className="text-[var(--text-muted)] text-xs">{option.description}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>

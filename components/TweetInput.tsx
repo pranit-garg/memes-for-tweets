@@ -25,73 +25,62 @@ export default function TweetInput({
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-      {/* Rage box container */}
-      <div className="rage-box p-1 bg-white">
-        <div className="relative">
-          {/* Label bar */}
-          <div className="bg-gradient-to-r from-[#1E90FF] to-[#00CED1] px-3 py-2 border-b-4 border-black">
-            <span className="impact-text text-white text-sm tracking-wide drop-shadow-md">
-              📝 ENTER UR TWEET HERE 📝
-            </span>
-          </div>
-          
-          <textarea
-            value={tweet}
-            onChange={(e) => setTweet(e.target.value)}
-            placeholder="paste ur tweet here lol..."
-            maxLength={maxLength}
-            disabled={disabled}
-            className="w-full h-32 p-4 text-lg text-black bg-white
-                       border-0 outline-none resize-none
-                       disabled:bg-gray-200 disabled:cursor-not-allowed
-                       placeholder:text-gray-400 placeholder:italic
-                       focus:bg-[#FFFACD]
-                       transition-colors"
-            style={{ fontFamily: "'Comic Sans MS', 'Comic Neue', cursive" }}
-          />
-          
-          {/* Character counter - old school style */}
-          <div className="absolute bottom-2 right-3 px-2 py-1 bg-black text-[#00FF00] text-xs font-mono">
+      <div className="card p-1">
+        <textarea
+          value={tweet}
+          onChange={(e) => setTweet(e.target.value)}
+          placeholder="Paste your tweet here..."
+          maxLength={maxLength}
+          disabled={disabled}
+          className="w-full h-28 p-4 text-base bg-transparent
+                     outline-none resize-none
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     placeholder:text-[var(--text-muted)]"
+        />
+        
+        {/* Bottom bar */}
+        <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border)]">
+          <span className="text-xs text-[var(--text-muted)]">
             {tweet.length}/{maxLength}
-          </div>
+          </span>
+          
+          <button
+            type="submit"
+            disabled={!tweet.trim() || isLoading || disabled}
+            className="py-2 px-5 btn-primary text-sm
+                       disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none
+                       flex items-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <span>Matching...</span>
+              </>
+            ) : (
+              <span>Match my tweet</span>
+            )}
+          </button>
         </div>
       </div>
-
-      {/* Big chunky submit button */}
-      <button
-        type="submit"
-        disabled={!tweet.trim() || isLoading || disabled}
-        className={`mt-4 w-full py-4 px-6 
-                   impact-text text-xl tracking-wider
-                   border-4 border-black
-                   transition-all
-                   ${!tweet.trim() || isLoading || disabled 
-                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
-                     : 'bg-gradient-to-r from-[#FF4444] via-[#FF8C00] to-[#FFD700] text-white glossy-btn cursor-pointer'
-                   }
-                   flex items-center justify-center gap-3`}
-      >
-        {isLoading ? (
-          <>
-            <div className="relative w-6 h-6">
-              <div className="absolute inset-0 border-4 border-white border-t-transparent rounded-full animate-spin" />
-            </div>
-            <span>FINDING EPIC MEMES...</span>
-            <span className="animate-pulse">🔍</span>
-          </>
-        ) : (
-          <>
-            <span>🎯</span>
-            <span>MATCH MY TWEET</span>
-            <span>🎯</span>
-          </>
-        )}
-      </button>
-
-      {/* Subtext */}
-      <p className="text-center mt-3 text-sm text-white/70">
-        ↑ click da button 4 epic memes ↑
-      </p>
     </form>
   );
 }

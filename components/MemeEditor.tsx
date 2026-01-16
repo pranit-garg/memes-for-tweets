@@ -17,39 +17,27 @@ interface MemeEditorProps {
 
 interface TextSettings {
   fontSize: number;
-  yOffset: number; // 0-100, where 0 is at edge, 100 is toward center
+  yOffset: number;
 }
 
-// Wrap text to fit within maxWidth
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-): string[] {
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
   let currentLine = '';
 
   for (const word of words) {
     const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const metrics = ctx.measureText(testLine);
-
-    if (metrics.width > maxWidth && currentLine) {
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
       lines.push(currentLine);
       currentLine = word;
     } else {
       currentLine = testLine;
     }
   }
-
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-
+  if (currentLine) lines.push(currentLine);
   return lines;
 }
 
-// Draw meme-style text with thick outline
 function drawMemeText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -59,47 +47,36 @@ function drawMemeText(
   maxWidth: number,
   isBottom: boolean
 ) {
-  ctx.font = `bold ${fontSize}px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif`;
+  ctx.font = `bold ${fontSize}px Impact, 'Arial Black', sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = isBottom ? 'bottom' : 'top';
   
   const lines = wrapText(ctx, text.toUpperCase(), maxWidth);
   const lineHeight = fontSize * 1.1;
   
-  // Calculate starting Y
   let startY = y;
   if (isBottom) {
-    // For bottom text, we start from y and go up
     startY = y - (lines.length - 1) * lineHeight;
   }
 
   lines.forEach((line, index) => {
     const lineY = startY + index * lineHeight;
     
-    // Draw black outline (multiple passes for thickness)
     ctx.strokeStyle = 'black';
     ctx.lineWidth = fontSize * 0.15;
     ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
     
     for (let i = 0; i < 4; i++) {
       ctx.strokeText(line, x, lineY);
     }
-
-    // Draw white fill
     ctx.fillStyle = 'white';
     ctx.fillText(line, x, lineY);
   });
 }
 
-export default function MemeEditor({
-  match,
-  onDownload,
-  onBack,
-}: MemeEditorProps) {
+export default function MemeEditor({ match, onDownload, onBack }: MemeEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Initialize text from textBoxes or fallback to top/bottom
   const initialTopText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
   const initialBottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
   
@@ -109,15 +86,9 @@ export default function MemeEditor({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   
-  // Text customization settings - default to smaller text that doesn't cover image
-  const [topSettings, setTopSettings] = useState<TextSettings>({
-    fontSize: 40, // percentage of auto-calculated size (smaller default)
-    yOffset: 0,   // 0 = at edge, higher = more toward center
-  });
-  const [bottomSettings, setBottomSettings] = useState<TextSettings>({
-    fontSize: 40,
-    yOffset: 0,
-  });
+  const [topSettings, setTopSettings] = useState<TextSettings>({ fontSize: 40, yOffset: 0 });
+  const [bottomSettings, setBottomSettings] = useState<TextSettings>({ fontSize: 40, yOffset: 0 });
+  
   const [, setTextBoxes] = useState<TextBox[]>(
     match.textBoxes || [
       { position: 'top', text: initialTopText },
@@ -125,7 +96,6 @@ export default function MemeEditor({
     ]
   );
 
-  // Update textBoxes when top/bottom text changes
   useEffect(() => {
     setTextBoxes(prev => {
       const newBoxes = [...prev];
@@ -146,33 +116,25 @@ export default function MemeEditor({
     img.crossOrigin = 'anonymous';
 
     img.onload = () => {
-      // Set canvas size to match image (max 600px width for quality)
       const maxWidth = 600;
       const scale = Math.min(1, maxWidth / img.width);
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
 
-      // Draw image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Calculate text sizing - SMALLER to not cover image content
-      // Base size is ~1/14 of width, user can scale from 20% to 100% of that
       const baseFontSize = Math.min(canvas.width / 14, canvas.height / 16);
-      const padding = canvas.width * 0.02; // Minimal padding - text at absolute edge
+      const padding = canvas.width * 0.02;
       const maxTextWidth = canvas.width - padding * 2;
 
-      // Draw top text - at the ABSOLUTE TOP EDGE
       if (topText.trim()) {
         const fontSize = baseFontSize * (topSettings.fontSize / 50);
-        // yOffset moves text DOWN from the top edge (toward center)
         const yPos = padding + (topSettings.yOffset / 100) * (canvas.height * 0.2);
         drawMemeText(ctx, topText, canvas.width / 2, yPos, fontSize, maxTextWidth, false);
       }
 
-      // Draw bottom text - at the ABSOLUTE BOTTOM EDGE
       if (bottomText.trim()) {
         const fontSize = baseFontSize * (bottomSettings.fontSize / 50);
-        // yOffset moves text UP from the bottom edge (toward center)
         const yPos = canvas.height - padding - (bottomSettings.yOffset / 100) * (canvas.height * 0.2);
         drawMemeText(ctx, bottomText, canvas.width / 2, yPos, fontSize, maxTextWidth, true);
       }
@@ -190,11 +152,10 @@ export default function MemeEditor({
     if (!canvas) return;
 
     setIsDownloading(true);
-
     try {
       const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `meme-${match.templateId}-${Date.now()}.png`;
+      link.download = `meme-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
       onDownload();
@@ -205,7 +166,7 @@ export default function MemeEditor({
     }
   };
 
-  const handleCopyToClipboard = async () => {
+  const handleCopy = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -214,9 +175,7 @@ export default function MemeEditor({
         canvas.toBlob(resolve, 'image/png')
       );
       if (blob) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob }),
-        ]);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
       }
@@ -225,177 +184,157 @@ export default function MemeEditor({
     }
   };
 
-  const handleShareToTwitter = () => {
-    const tweetText = encodeURIComponent(
-      `Made this meme in 10 seconds 🔥\n\nmemes-for-tweets.vercel.app`
-    );
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}`;
-    window.open(twitterUrl, '_blank', 'noopener,noreferrer');
+  const handleShare = () => {
+    const text = encodeURIComponent('Made this meme in 10 seconds\n\nmemes-for-tweets.vercel.app');
+    window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
   };
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      {/* Back button */}
       <button
         onClick={onBack}
-        className="mb-4 text-[#FFD700] hover:text-white flex items-center gap-2 font-bold transition-colors"
+        className="mb-4 text-[var(--text-secondary)] hover:text-white flex items-center gap-2 text-sm transition-colors"
       >
-        <span className="text-xl">←</span>
-        <span>BACK 2 MEMES</span>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to templates
       </button>
 
-      {/* Main editor box */}
-      <div className="rage-box bg-white p-0 overflow-hidden">
-        {/* Header bar */}
-        <div className="bg-gradient-to-r from-[#9932CC] to-[#FF69B4] px-4 py-3 border-b-4 border-black">
-          <h2 className="impact-text text-white text-xl tracking-wide text-center drop-shadow-md">
-            ✏️ EDIT UR MEME ✏️
-          </h2>
-          <p className="text-white/80 text-sm text-center">
-            {match.templateName}
-          </p>
-        </div>
-
+      <div className="card overflow-hidden">
         {/* Preview */}
-        <div className="p-4 bg-[#f0f0f0] border-b-4 border-black">
+        <div className="p-4 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
           <div className="flex justify-center">
-            <canvas
-              ref={canvasRef}
-              className="max-w-full border-4 border-black shadow-lg"
-            />
+            <canvas ref={canvasRef} className="max-w-full rounded-lg" />
           </div>
         </div>
 
         {/* Text inputs */}
-        <div className="p-4 space-y-4 bg-white">
+        <div className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-bold text-black mb-2 uppercase">
-              📝 Top Text
-            </label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-2">Top text</label>
             <input
               type="text"
               value={topText}
               onChange={(e) => setTopText(e.target.value)}
               placeholder="Enter top text..."
-              className="w-full p-3 text-black bg-[#FFFACD] border-4 border-black
-                       focus:bg-white focus:ring-2 focus:ring-[#FFD700]
-                       outline-none transition-all placeholder:text-gray-400"
-              style={{ fontFamily: "'Comic Sans MS', 'Comic Neue', cursive" }}
+              className="w-full p-3 input"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-black mb-2 uppercase">
-              📝 Bottom Text
-            </label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-2">Bottom text</label>
             <input
               type="text"
               value={bottomText}
               onChange={(e) => setBottomText(e.target.value)}
               placeholder="Enter bottom text..."
-              className="w-full p-3 text-black bg-[#FFFACD] border-4 border-black
-                       focus:bg-white focus:ring-2 focus:ring-[#FFD700]
-                       outline-none transition-all placeholder:text-gray-400"
-              style={{ fontFamily: "'Comic Sans MS', 'Comic Neue', cursive" }}
+              className="w-full p-3 input"
             />
           </div>
 
-          {/* Advanced controls toggle */}
+          {/* Advanced toggle */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full py-2 text-sm text-gray-600 hover:text-black 
-                       flex items-center justify-center gap-2 transition-colors border-2 border-dashed border-gray-300"
+            className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] 
+                       flex items-center justify-center gap-2 transition-colors"
           >
-            <span className={`transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>▶</span>
-            {showAdvanced ? 'Hide' : 'Show'} text controls
+            <svg
+              className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            {showAdvanced ? 'Hide' : 'Adjust'} text size & position
           </button>
 
           {/* Advanced controls */}
           {showAdvanced && (
-            <div className="p-4 bg-[#f0f0f0] border-4 border-black space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-bold text-black">TOP SIZE</label>
-                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{topSettings.fontSize}%</span>
+            <div className="p-4 bg-[var(--bg-secondary)] rounded-lg space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                    <span>Top size</span>
+                    <span>{topSettings.fontSize}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    value={topSettings.fontSize}
+                    onChange={(e) => setTopSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                    className="w-full accent-[var(--accent)]"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  value={topSettings.fontSize}
-                  onChange={(e) => setTopSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
-                />
+                <div>
+                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                    <span>Top position</span>
+                    <span>{topSettings.yOffset}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    value={topSettings.yOffset}
+                    onChange={(e) => setTopSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
+                    className="w-full accent-[var(--accent)]"
+                  />
+                </div>
               </div>
               
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-bold text-black">TOP POSITION</label>
-                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{topSettings.yOffset === 0 ? 'EDGE' : `+${topSettings.yOffset}%`}</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                    <span>Bottom size</span>
+                    <span>{bottomSettings.fontSize}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    value={bottomSettings.fontSize}
+                    onChange={(e) => setBottomSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
+                    className="w-full accent-[var(--accent)]"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  value={topSettings.yOffset}
-                  onChange={(e) => setTopSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
-                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
-                />
-              </div>
-
-              <hr className="border-2 border-black" />
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-bold text-black">BOTTOM SIZE</label>
-                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{bottomSettings.fontSize}%</span>
+                <div>
+                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                    <span>Bottom position</span>
+                    <span>{bottomSettings.yOffset}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    value={bottomSettings.yOffset}
+                    onChange={(e) => setBottomSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
+                    className="w-full accent-[var(--accent)]"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  value={bottomSettings.fontSize}
-                  onChange={(e) => setBottomSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
-                />
-              </div>
-              
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-bold text-black">BOTTOM POSITION</label>
-                  <span className="text-xs bg-black text-[#00FF00] px-2 py-1 font-mono">{bottomSettings.yOffset === 0 ? 'EDGE' : `+${bottomSettings.yOffset}%`}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  value={bottomSettings.yOffset}
-                  onChange={(e) => setBottomSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
-                  className="w-full h-4 bg-gray-300 rounded-none appearance-none cursor-pointer accent-[#FF4444]"
-                />
               </div>
             </div>
           )}
         </div>
 
-        {/* Action buttons */}
-        <div className="p-4 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] border-t-4 border-black space-y-3">
+        {/* Actions */}
+        <div className="p-4 border-t border-[var(--border)] space-y-3">
           <div className="flex gap-3">
-            <button
-              onClick={handleCopyToClipboard}
-              className="flex-1 py-3 px-4 bg-[#1E90FF] text-white font-bold
-                         border-4 border-black glossy-btn
-                         flex items-center justify-center gap-2 uppercase"
-            >
+            <button onClick={handleCopy} className="flex-1 py-2.5 btn-secondary flex items-center justify-center gap-2">
               {copySuccess ? (
                 <>
-                  <span>✓</span>
-                  <span>COPIED!</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Copied
                 </>
               ) : (
                 <>
-                  <span>📋</span>
-                  <span>COPY</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy
                 </>
               )}
             </button>
@@ -403,33 +342,35 @@ export default function MemeEditor({
             <button
               onClick={handleDownload}
               disabled={isDownloading}
-              className="flex-1 py-3 px-4 bg-[#00FF00] text-black font-bold
-                         border-4 border-black glossy-btn
-                         disabled:bg-gray-400 disabled:cursor-not-allowed
-                         flex items-center justify-center gap-2 uppercase"
+              className="flex-1 py-2.5 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isDownloading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  <span>SAVING...</span>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Saving...
                 </>
               ) : (
                 <>
-                  <span>💾</span>
-                  <span>DOWNLOAD</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
                 </>
               )}
             </button>
           </div>
 
           <button
-            onClick={handleShareToTwitter}
-            className="w-full py-3 px-4 bg-black text-white font-bold
-                       border-4 border-[#1DA1F2] hover:bg-[#1DA1F2] transition-colors
-                       flex items-center justify-center gap-2 uppercase"
+            onClick={handleShare}
+            className="w-full py-2.5 btn-secondary flex items-center justify-center gap-2"
           >
-            <span>🐦</span>
-            <span>SHARE 2 TWITTER</span>
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+            Share to X
           </button>
         </div>
       </div>
