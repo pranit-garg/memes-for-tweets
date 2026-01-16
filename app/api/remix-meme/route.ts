@@ -1,110 +1,182 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface RemixTemplate {
+type RemixMode = 'style' | 'context' | 'mashup' | 'modernize' | 'subvert' | 'genre' | 'custom';
+
+interface MemeInfo {
   id: string;
   name: string;
-  description: string;
-  prompt: string;
-}
-
-interface BrandProfile {
-  avatarDescription: string;
-  brandColors: {
-    primary: string;
-    secondary: string;
-  };
-  characterStyle: string;
-  avatarUrl?: string | null;
+  url: string;
+  structure: string;
 }
 
 interface RemixRequest {
-  template: RemixTemplate;
-  profile: BrandProfile;
+  mode: RemixMode;
+  meme: MemeInfo;
+  secondMeme?: MemeInfo | null;
+  style?: string;
+  aesthetic?: string;
+  customPrompt?: string;
+  contextDescription?: string;
+  modernTopic?: string;
+  subversionTwist?: string;
 }
 
-// Convert hex color to descriptive name
-function hexToColorName(hex: string): string {
-  const colors: Record<string, string> = {
-    '#FF0000': 'red', '#FF4500': 'orange-red', '#FFA500': 'orange',
-    '#FFFF00': 'yellow', '#00FF00': 'lime green', '#008000': 'green',
-    '#00FFFF': 'cyan', '#0000FF': 'blue', '#4B0082': 'indigo',
-    '#8B5CF6': 'purple', '#EE82EE': 'violet', '#FF00FF': 'magenta',
-    '#FFC0CB': 'pink', '#FFFFFF': 'white', '#000000': 'black',
-    '#808080': 'gray', '#A52A2A': 'brown', '#1E1E2E': 'dark blue-gray',
-  };
-  
-  // Find closest color match
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  
-  let closestColor = 'colored';
-  let minDistance = Infinity;
-  
-  for (const [hexColor, name] of Object.entries(colors)) {
-    const r2 = parseInt(hexColor.slice(1, 3), 16);
-    const g2 = parseInt(hexColor.slice(3, 5), 16);
-    const b2 = parseInt(hexColor.slice(5, 7), 16);
-    
-    const distance = Math.sqrt(
-      Math.pow(r - r2, 2) + Math.pow(g - g2, 2) + Math.pow(b - b2, 2)
-    );
-    
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestColor = name;
-    }
+// Art style descriptions for DALL-E
+const STYLE_DESCRIPTIONS: Record<string, string> = {
+  'pixel': '16-bit pixel art style, retro video game aesthetic, limited color palette, blocky pixels visible',
+  'anime': 'anime/manga art style, expressive eyes, dynamic poses, Japanese animation aesthetic',
+  'watercolor': 'watercolor painting style, soft flowing colors, paper texture, artistic brush strokes',
+  'oil-painting': 'classical oil painting style like Renaissance masters, rich colors, visible brushwork, dramatic lighting',
+  'sketch': 'pencil sketch style, hand-drawn lines, shading with hatching, paper texture',
+  'comic': 'comic book style, bold black outlines, halftone dots, vibrant colors, action lines',
+  'minimalist': 'minimalist flat design, simple geometric shapes, limited colors, clean and modern',
+  '3d-render': 'Pixar/Disney 3D animation style, smooth CGI rendering, expressive characters',
+  'claymation': 'stop-motion claymation style like Wallace and Gromit, clay texture, warm lighting',
+  'stained-glass': 'stained glass window style, bold black outlines, jewel-toned segments, cathedral aesthetic',
+  'woodcut': 'medieval woodcut print style, bold black and white, carved line texture',
+  'neon': 'synthwave/vaporwave neon style, glowing neon colors, 80s retro futurism, grid backgrounds',
+};
+
+// Aesthetic descriptions
+const AESTHETIC_DESCRIPTIONS: Record<string, string> = {
+  'vaporwave': 'vaporwave aesthetic with pink and purple gradients, glitch effects, Greek statues, retro tech, Japanese text',
+  'corporate': 'corporate Memphis flat illustration style, bright colors, abstract blob shapes, diverse stick figures',
+  'dark-academia': 'dark academia aesthetic, moody lighting, old books, gothic architecture, sepia tones, scholarly',
+  'cottagecore': 'cottagecore aesthetic, pastoral countryside, wildflowers, cozy cottage, soft warm lighting',
+  'y2k': 'Y2K aesthetic, early 2000s futurism, chrome effects, bubble fonts, blue and silver colors',
+  'liminal': 'liminal space aesthetic, empty hallways, fluorescent lighting, unsettling emptiness, dreamlike',
+  'weirdcore': 'weirdcore aesthetic, surreal, low-quality images, nostalgic yet unsettling, distorted',
+  'frutiger-aero': 'Frutiger Aero aesthetic, glossy bubbles, nature imagery, glass effects, mid-2000s tech',
+  'brutalist': 'brutalist aesthetic, raw concrete, stark geometric shapes, monochrome, imposing',
+  'maximalist': 'maximalist aesthetic, overwhelming detail, clashing patterns, more-is-more, chaotic beauty',
+};
+
+// Build prompts for different remix modes
+function buildRemixPrompt(request: RemixRequest): string {
+  const { mode, meme, secondMeme, style, aesthetic, customPrompt, contextDescription, modernTopic, subversionTwist } = request;
+
+  let prompt = '';
+
+  switch (mode) {
+    case 'style':
+      const styleDesc = STYLE_DESCRIPTIONS[style || ''] || 'artistic style';
+      prompt = `Create the "${meme.name}" meme in ${styleDesc}.
+
+The meme should capture the same energy and joke structure: "${meme.structure}"
+
+Key requirements:
+- Recreate the iconic composition of the ${meme.name} meme
+- Apply the art style consistently throughout
+- The meme format should be immediately recognizable
+- Keep the same poses and expressions that make this meme work
+- Do NOT include any text overlays - just the image
+
+Make it high quality, shareable, and faithful to both the meme format and the artistic style.`;
+      break;
+
+    case 'context':
+      prompt = `Recreate the "${meme.name}" meme but in a completely new context: ${contextDescription}
+
+Original meme structure: "${meme.structure}"
+
+Requirements:
+- Keep the same comedic structure and format
+- Apply it to the new context described
+- The pose/composition should mirror the original meme
+- Make it feel like a fresh take on a classic format
+- Characters and setting should match the new context
+- Do NOT include any text - the image should work on its own
+
+The result should be immediately recognizable as the ${meme.name} format, but with an exciting new twist.`;
+      break;
+
+    case 'mashup':
+      prompt = `Create a creative mashup combining two memes into one image:
+
+Meme 1: "${meme.name}" - ${meme.structure}
+Meme 2: "${secondMeme?.name}" - ${secondMeme?.structure}
+
+Create a single cohesive image that combines elements from both memes in a clever way. This could mean:
+- Characters from one meme in the pose/situation of the other
+- The visual format of one with the energy of the other  
+- A creative blend that honors both originals
+
+Make it feel like a natural evolution of meme culture - something that could go viral.
+Do NOT include any text overlays.`;
+      break;
+
+    case 'modernize':
+      prompt = `Update the classic "${meme.name}" meme for 2024 with the theme: ${modernTopic}
+
+Original structure: "${meme.structure}"
+
+Create a fresh version that:
+- Keeps the iconic format recognizable
+- Updates the subject matter for ${modernTopic}
+- Feels relevant and current
+- Would resonate with today's internet culture
+- Uses modern visual elements where appropriate
+
+Make it feel like a natural evolution of this classic meme for today's world.
+Do NOT include text overlays.`;
+      break;
+
+    case 'subvert':
+      prompt = `Create a subverted version of the "${meme.name}" meme with this twist: ${subversionTwist}
+
+Original meaning: "${meme.structure}"
+
+The subversion should:
+- Use the same visual format as the original
+- Flip or twist the expected meaning
+- Create surprise or humor through the unexpected take
+- Still be recognizable as the original meme format
+
+Make the twist clever and shareable.
+Do NOT include text overlays - the image should convey the subversion visually.`;
+      break;
+
+    case 'genre':
+      const aesDesc = AESTHETIC_DESCRIPTIONS[aesthetic || ''] || aesthetic;
+      prompt = `Transform the "${meme.name}" meme into the ${aesthetic} aesthetic.
+
+Apply: ${aesDesc}
+
+The result should:
+- Be immediately recognizable as the ${meme.name} meme format
+- Fully embrace the ${aesthetic} aesthetic
+- Feel like authentic ${aesthetic} content
+- Maintain the meme's core composition and energy
+
+Create something that fans of both the meme and the aesthetic would love.
+Do NOT include text overlays.`;
+      break;
+
+    case 'custom':
+      prompt = `Create a creative remix of the "${meme.name}" meme with this vision:
+
+${customPrompt}
+
+Original meme structure: "${meme.structure}"
+
+Make it creative, high quality, and shareable. The result should feel fresh while honoring the original meme's spirit.
+Do NOT include text overlays.`;
+      break;
+
+    default:
+      throw new Error('Invalid remix mode');
   }
-  
-  return closestColor;
-}
 
-// Build the image generation prompt
-function buildRemixPrompt(template: RemixTemplate, profile: BrandProfile): string {
-  const primaryColor = hexToColorName(profile.brandColors.primary);
-  const secondaryColor = hexToColorName(profile.brandColors.secondary);
-  
-  const styleGuides: Record<string, string> = {
-    cartoon: 'in a clean cartoon style with bold outlines, vibrant colors',
-    realistic: 'in a semi-realistic digital art style',
-    anime: 'in anime/manga art style with expressive features',
-    sketch: 'in a hand-drawn sketch style with pencil textures',
-    pixel: 'in pixel art style, retro 16-bit aesthetic',
-    minimalist: 'in a minimalist flat design style with simple shapes',
-  };
-  
-  const styleGuide = styleGuides[profile.characterStyle] || styleGuides.cartoon;
-  
-  return `Create a meme image ${styleGuide}.
-
-The image should show: ${profile.avatarDescription} doing the following pose/action: ${template.prompt}
-
-Key elements:
-- The character should be: ${profile.avatarDescription}
-- Main color theme: ${primaryColor} and ${secondaryColor}
-- Any props or background elements should incorporate these brand colors
-- The character should have the personality and essence described, not just be a generic character
-- Make sure the character is clearly the main focus
-- The pose/action should match the classic "${template.name}" meme format
-
-Style requirements:
-- ${styleGuide}
-- Professional quality suitable for social media
-- Clear, readable composition
-- The character should be expressive and engaging
-
-Do NOT include any text overlays or captions in the image.`;
+  return prompt;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check for API key
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: 'Image generation is not configured. Please add OPENAI_API_KEY.' },
@@ -113,28 +185,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body: RemixRequest = await request.json();
-    const { template, profile } = body;
+    const { mode, meme } = body;
 
-    // Validate request
-    if (!template || !profile) {
+    if (!mode || !meme) {
       return NextResponse.json(
-        { error: 'Missing template or profile data' },
+        { error: 'Missing mode or meme data' },
         { status: 400 }
       );
     }
 
-    if (!profile.avatarDescription || profile.avatarDescription.trim().length < 10) {
-      return NextResponse.json(
-        { error: 'Please provide a more detailed avatar description' },
-        { status: 400 }
-      );
-    }
+    // Build the prompt based on mode
+    const prompt = buildRemixPrompt(body);
+    console.log('Generating remix with prompt:', prompt.slice(0, 300) + '...');
 
-    // Build the prompt
-    const prompt = buildRemixPrompt(template, profile);
-    console.log('Generating remix with prompt:', prompt.slice(0, 200) + '...');
-
-    // Generate image with DALL-E 3
+    // Generate with DALL-E 3
     const response = await openai.images.generate({
       model: 'dall-e-3',
       prompt,
@@ -154,13 +218,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       imageUrl,
-      prompt: prompt.slice(0, 100) + '...', // Return truncated prompt for debugging
+      mode,
+      meme: meme.name,
     });
 
   } catch (error) {
     console.error('Remix generation error:', error);
 
-    // Handle OpenAI-specific errors
     if (error instanceof OpenAI.APIError) {
       if (error.status === 400 && error.message.includes('safety')) {
         return NextResponse.json(

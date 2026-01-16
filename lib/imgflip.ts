@@ -927,10 +927,23 @@ export async function getMemeTemplates(): Promise<MemeTemplate[]> {
     throw new Error('Failed to fetch meme templates');
   }
 
+  // Return ALL templates from imgflip, not just curated
+  // Imgflip returns 100+ templates sorted by popularity
   cachedTemplates = data.data.memes;
   cacheTimestamp = Date.now();
 
+  console.log(`Loaded ${cachedTemplates.length} templates from imgflip`);
   return cachedTemplates;
+}
+
+// Get full expanded meme library from all sources
+export async function getExpandedMemeLibrary(): Promise<MemeTemplate[]> {
+  const imgflipMemes = await getMemeTemplates();
+  
+  // For now, return all imgflip memes (100+)
+  // In production, this would also fetch from memegen.link API
+  // and merge with our custom templates
+  return imgflipMemes;
 }
 
 export async function captionImage(

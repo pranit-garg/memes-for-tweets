@@ -1,92 +1,159 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
-// Popular meme templates that work well for remixing
-const REMIX_TEMPLATES = [
+// Remix modes - different ways to creatively transform a meme
+type RemixMode = 
+  | 'style'      // Change the art style (pixel art, anime, watercolor, etc.)
+  | 'context'    // Same joke format, different setting/subject
+  | 'mashup'     // Combine two memes into one
+  | 'modernize'  // Update an old meme for current times
+  | 'subvert'    // Flip the expected punchline
+  | 'genre'      // Apply a genre/aesthetic (vaporwave, corporate, dark academia)
+  | 'custom';    // Freeform creative remix
+
+interface RemixModeInfo {
+  id: RemixMode;
+  name: string;
+  icon: string;
+  description: string;
+  examples: string[];
+  promptHint: string;
+}
+
+const REMIX_MODES: RemixModeInfo[] = [
   {
-    id: 'gamer-lean',
-    name: 'Gamer Lean',
-    description: 'Person leaning forward intensely at screen',
-    previewUrl: 'https://i.imgflip.com/2bmnqx.jpg',
-    prompt: 'person leaning forward intensely while sitting, focused expression, holding controller or at computer',
+    id: 'style',
+    name: 'Style Transfer',
+    icon: '🎨',
+    description: 'Same meme, completely different art style',
+    examples: ['Pixel art Drake', 'Anime Distracted Boyfriend', 'Watercolor This is Fine'],
+    promptHint: 'Recreate this meme in [STYLE] art style',
   },
   {
-    id: 'drake',
-    name: 'Drake Hotline Bling',
-    description: 'Rejecting one thing, approving another',
-    previewUrl: 'https://i.imgflip.com/30b1gx.jpg',
-    prompt: 'two panel meme, top panel person rejecting/disgusted, bottom panel person approving/happy',
+    id: 'context',
+    name: 'New Context',
+    icon: '🔄',
+    description: 'Same joke structure, different setting or subject',
+    examples: ['Drake but with food choices', 'Distracted Boyfriend in medieval times', 'Corporate version of any meme'],
+    promptHint: 'Apply the joke format to [NEW CONTEXT]',
   },
   {
-    id: 'distracted-boyfriend',
-    name: 'Distracted Boyfriend',
-    description: 'Looking at something new while ignoring current thing',
-    previewUrl: 'https://i.imgflip.com/1ur9b0.jpg',
-    prompt: 'person looking back at something new while partner looks disapprovingly',
+    id: 'mashup',
+    name: 'Meme Mashup',
+    icon: '🔀',
+    description: 'Combine elements from two different memes',
+    examples: ['Drake + Expanding Brain', 'Distracted Boyfriend meets Woman Yelling at Cat'],
+    promptHint: 'Combine [MEME 1] with [MEME 2]',
   },
   {
-    id: 'thinking',
-    name: 'Roll Safe Think',
-    description: 'Tapping head with "clever" expression',
-    previewUrl: 'https://i.imgflip.com/1h7in3.jpg',
-    prompt: 'person tapping their temple/head with knowing smug expression, thinking pose',
+    id: 'modernize',
+    name: 'Modernize',
+    icon: '📱',
+    description: 'Update a classic meme for 2024+',
+    examples: ['Bad Luck Brian but about AI', 'Success Kid but about WFH', 'Doge in the age of crypto'],
+    promptHint: 'Update this classic meme for modern times with [TOPIC]',
   },
   {
-    id: 'this-is-fine',
-    name: 'This Is Fine',
-    description: 'Sitting calmly while everything burns',
-    previewUrl: 'https://i.imgflip.com/wxica.jpg',
-    prompt: 'character sitting calmly at table while room is on fire, drinking coffee',
+    id: 'subvert',
+    name: 'Subvert Expectations',
+    icon: '🔃',
+    description: 'Flip the expected punchline or meaning',
+    examples: ['Drake approving the "wrong" thing', 'Wholesome version of dark meme', 'Positive spin on negative format'],
+    promptHint: 'Subvert this meme by [TWIST]',
   },
   {
-    id: 'surprised',
-    name: 'Surprised Face',
-    description: 'Shocked reaction face',
-    previewUrl: 'https://i.imgflip.com/2kbn1e.jpg',
-    prompt: 'character with extremely surprised shocked expression, wide eyes open mouth',
+    id: 'genre',
+    name: 'Apply Aesthetic',
+    icon: '✨',
+    description: 'Apply a specific aesthetic or genre',
+    examples: ['Vaporwave Drake', 'Corporate Memphis style', 'Dark academia aesthetic', 'Y2K aesthetic'],
+    promptHint: 'Apply [AESTHETIC] aesthetic to this meme',
+  },
+  {
+    id: 'custom',
+    name: 'Custom Remix',
+    icon: '🎯',
+    description: 'Describe exactly how you want to remix it',
+    examples: ['Your creative vision', 'Specific character or brand', 'Unique mashup idea'],
+    promptHint: 'Freeform: describe your creative vision',
   },
 ];
 
-interface BrandProfile {
-  avatarUrl: string | null;
-  avatarDescription: string;
-  brandColors: {
-    primary: string;
-    secondary: string;
-  };
-  characterStyle: string;
-}
+// Popular memes to remix (curated selection with good remix potential)
+const REMIXABLE_MEMES = [
+  { id: 'drake', name: 'Drake Hotline Bling', url: 'https://i.imgflip.com/30b1gx.jpg', structure: 'reject A / approve B' },
+  { id: 'distracted', name: 'Distracted Boyfriend', url: 'https://i.imgflip.com/1ur9b0.jpg', structure: 'temptation pulling away from duty' },
+  { id: 'expanding-brain', name: 'Expanding Brain', url: 'https://i.imgflip.com/1jwhww.jpg', structure: 'escalating enlightenment/absurdity' },
+  { id: 'woman-cat', name: 'Woman Yelling at Cat', url: 'https://i.imgflip.com/345v97.jpg', structure: 'angry accusation vs calm denial' },
+  { id: 'this-is-fine', name: 'This Is Fine', url: 'https://i.imgflip.com/wxica.jpg', structure: 'denial amid chaos' },
+  { id: 'gru-plan', name: "Gru's Plan", url: 'https://i.imgflip.com/26jxvz.jpg', structure: 'plan backfires unexpectedly' },
+  { id: 'panik-kalm', name: 'Panik Kalm Panik', url: 'https://i.imgflip.com/3qqcim.png', structure: 'emotional rollercoaster' },
+  { id: 'buff-doge', name: 'Buff Doge vs Cheems', url: 'https://i.imgflip.com/43a45p.png', structure: 'then vs now comparison' },
+  { id: 'trade-offer', name: 'Trade Offer', url: 'https://i.imgflip.com/54hjww.jpg', structure: 'unfair exchange proposal' },
+  { id: 'uno-draw25', name: 'UNO Draw 25', url: 'https://i.imgflip.com/3lmzyx.jpg', structure: 'refusing reasonable option' },
+  { id: 'bernie', name: 'Bernie Asking', url: 'https://i.imgflip.com/4inzti.png', structure: 'repeated request/plea' },
+  { id: 'always-has-been', name: 'Always Has Been', url: 'https://i.imgflip.com/46e43q.png', structure: 'revelation of truth' },
+  { id: 'change-my-mind', name: 'Change My Mind', url: 'https://i.imgflip.com/24y43o.jpg', structure: 'confident hot take' },
+  { id: 'two-buttons', name: 'Two Buttons', url: 'https://i.imgflip.com/1g8my4.jpg', structure: 'impossible choice/dilemma' },
+  { id: 'clown-makeup', name: 'Clown Applying Makeup', url: 'https://i.imgflip.com/38el31.jpg', structure: 'escalating self-delusion' },
+  { id: 'stonks', name: 'Stonks', url: 'https://i.imgflip.com/30bib0.jpg', structure: 'ironic success' },
+  { id: 'bike-fall', name: 'Bike Fall', url: 'https://i.imgflip.com/1b42wl.jpg', structure: 'self-sabotage' },
+  { id: 'pikachu', name: 'Surprised Pikachu', url: 'https://i.imgflip.com/2kbn1e.jpg', structure: 'obvious outcome surprises' },
+  { id: 'disaster-girl', name: 'Disaster Girl', url: 'https://i.imgflip.com/23ls.jpg', structure: 'enjoying chaos you caused' },
+  { id: 'galaxy-brain', name: 'Galaxy Brain', url: 'https://i.imgflip.com/2fw4hb.jpg', structure: 'ironic genius take' },
+];
+
+// Art styles for style transfer
+const ART_STYLES = [
+  { id: 'pixel', name: 'Pixel Art', icon: '👾', description: 'Retro 16-bit game aesthetic' },
+  { id: 'anime', name: 'Anime', icon: '🎌', description: 'Japanese animation style' },
+  { id: 'watercolor', name: 'Watercolor', icon: '🎨', description: 'Soft, flowing paint' },
+  { id: 'oil-painting', name: 'Oil Painting', icon: '🖼️', description: 'Classical Renaissance style' },
+  { id: 'sketch', name: 'Pencil Sketch', icon: '✏️', description: 'Hand-drawn look' },
+  { id: 'comic', name: 'Comic Book', icon: '💥', description: 'Bold lines, halftone dots' },
+  { id: 'minimalist', name: 'Minimalist', icon: '⬜', description: 'Clean, simple shapes' },
+  { id: '3d-render', name: '3D Render', icon: '🎮', description: 'CGI/Pixar style' },
+  { id: 'claymation', name: 'Claymation', icon: '🎭', description: 'Stop-motion clay look' },
+  { id: 'stained-glass', name: 'Stained Glass', icon: '🏛️', description: 'Cathedral window aesthetic' },
+  { id: 'woodcut', name: 'Woodcut', icon: '🪵', description: 'Medieval print style' },
+  { id: 'neon', name: 'Neon/Synthwave', icon: '🌆', description: '80s retro future' },
+];
+
+// Aesthetics for genre mode
+const AESTHETICS = [
+  { id: 'vaporwave', name: 'Vaporwave', description: 'Pink/purple, glitch, nostalgic' },
+  { id: 'corporate', name: 'Corporate Memphis', description: 'Flat illustrations, HR vibes' },
+  { id: 'dark-academia', name: 'Dark Academia', description: 'Gothic, scholarly, moody' },
+  { id: 'cottagecore', name: 'Cottagecore', description: 'Rural, cozy, nature' },
+  { id: 'y2k', name: 'Y2K', description: 'Early 2000s futurism' },
+  { id: 'liminal', name: 'Liminal Space', description: 'Unsettling, empty, dreamlike' },
+  { id: 'weirdcore', name: 'Weirdcore', description: 'Surreal, nostalgic, uncanny' },
+  { id: 'frutiger-aero', name: 'Frutiger Aero', description: 'Mid-2000s glossy tech' },
+  { id: 'brutalist', name: 'Brutalist', description: 'Raw concrete, stark' },
+  { id: 'maximalist', name: 'Maximalist', description: 'More is more, chaotic' },
+];
 
 export default function RemixStudio() {
-  const [step, setStep] = useState<'profile' | 'select' | 'generate' | 'result'>('profile');
-  const [profile, setProfile] = useState<BrandProfile>({
-    avatarUrl: null,
-    avatarDescription: '',
-    brandColors: { primary: '#8B5CF6', secondary: '#1E1E2E' },
-    characterStyle: 'cartoon',
-  });
-  const [selectedTemplate, setSelectedTemplate] = useState<typeof REMIX_TEMPLATES[0] | null>(null);
+  const [step, setStep] = useState<'mode' | 'meme' | 'customize' | 'generate' | 'result'>('mode');
+  const [selectedMode, setSelectedMode] = useState<RemixModeInfo | null>(null);
+  const [selectedMeme, setSelectedMeme] = useState<typeof REMIXABLE_MEMES[0] | null>(null);
+  const [secondMeme, setSecondMeme] = useState<typeof REMIXABLE_MEMES[0] | null>(null); // For mashup
+  const [selectedStyle, setSelectedStyle] = useState<string>('');
+  const [selectedAesthetic, setSelectedAesthetic] = useState<string>('');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [contextDescription, setContextDescription] = useState('');
+  const [modernTopic, setModernTopic] = useState('');
+  const [subversionTwist, setSubversionTwist] = useState('');
+  
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfile(prev => ({ ...prev, avatarUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleGenerateRemix = async () => {
-    if (!selectedTemplate) return;
+    if (!selectedMeme || !selectedMode) return;
     
     setIsGenerating(true);
     setError('');
@@ -96,13 +163,15 @@ export default function RemixStudio() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          template: selectedTemplate,
-          profile: {
-            avatarDescription: profile.avatarDescription,
-            brandColors: profile.brandColors,
-            characterStyle: profile.characterStyle,
-            avatarUrl: profile.avatarUrl,
-          },
+          mode: selectedMode.id,
+          meme: selectedMeme,
+          secondMeme: selectedMode.id === 'mashup' ? secondMeme : null,
+          style: selectedStyle,
+          aesthetic: selectedAesthetic,
+          customPrompt,
+          contextDescription,
+          modernTopic,
+          subversionTwist,
         }),
       });
 
@@ -123,21 +192,48 @@ export default function RemixStudio() {
 
   const handleDownload = async () => {
     if (!generatedImage) return;
-    
     try {
       const response = await fetch(generatedImage);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `remix-${selectedTemplate?.id || 'meme'}.png`;
+      a.download = `remix-${selectedMeme?.id || 'meme'}-${selectedMode?.id || 'custom'}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch {
-      // Fallback: open in new tab
       window.open(generatedImage, '_blank');
+    }
+  };
+
+  const resetToStart = () => {
+    setStep('mode');
+    setSelectedMode(null);
+    setSelectedMeme(null);
+    setSecondMeme(null);
+    setSelectedStyle('');
+    setSelectedAesthetic('');
+    setCustomPrompt('');
+    setContextDescription('');
+    setModernTopic('');
+    setSubversionTwist('');
+    setGeneratedImage(null);
+    setError('');
+  };
+
+  const canProceedFromCustomize = () => {
+    if (!selectedMode) return false;
+    switch (selectedMode.id) {
+      case 'style': return !!selectedStyle;
+      case 'context': return !!contextDescription;
+      case 'mashup': return !!secondMeme;
+      case 'modernize': return !!modernTopic;
+      case 'subvert': return !!subversionTwist;
+      case 'genre': return !!selectedAesthetic;
+      case 'custom': return !!customPrompt;
+      default: return false;
     }
   };
 
@@ -160,256 +256,292 @@ export default function RemixStudio() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {['profile', 'select', 'generate', 'result'].map((s, i) => (
-            <div key={s} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                step === s ? 'bg-[var(--accent)] text-white' : 
-                ['profile', 'select', 'generate', 'result'].indexOf(step) > i ? 'bg-green-500 text-white' : 
-                'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
-              }`}>
-                {['profile', 'select', 'generate', 'result'].indexOf(step) > i ? '✓' : i + 1}
-              </div>
-              {i < 3 && <div className={`w-12 h-0.5 mx-1 ${
-                ['profile', 'select', 'generate', 'result'].indexOf(step) > i ? 'bg-green-500' : 'bg-[var(--border)]'
-              }`} />}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1: Brand Profile */}
-        {step === 'profile' && (
-          <div className="space-y-8 fade-in">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-white mb-2">Create Your Brand Profile</h1>
-              <p className="text-[var(--text-secondary)]">
-                Tell us about your avatar so we can remix memes in your style
-              </p>
-            </div>
-
-            <div className="max-w-xl mx-auto space-y-6">
-              {/* Avatar upload */}
-              <div className="card p-6">
-                <label className="block text-sm font-medium text-white mb-3">
-                  Your Avatar/Character (optional)
-                </label>
-                <div className="flex items-center gap-4">
-                  <div 
-                    className="w-20 h-20 rounded-full bg-[var(--bg-tertiary)] border-2 border-dashed border-[var(--border)] flex items-center justify-center cursor-pointer hover:border-[var(--accent)] transition-colors overflow-hidden"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {profile.avatarUrl ? (
-                      <Image src={profile.avatarUrl} alt="Avatar" width={80} height={80} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-2xl">📷</span>
-                    )}
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      Upload your profile picture, logo, or character image
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Avatar description */}
-              <div className="card p-6">
-                <label className="block text-sm font-medium text-white mb-3">
-                  Describe Your Character/Avatar *
-                </label>
-                <textarea
-                  value={profile.avatarDescription}
-                  onChange={(e) => setProfile(prev => ({ ...prev, avatarDescription: e.target.value }))}
-                  placeholder="e.g., A cute penguin with big eyes wearing a hoodie, or A robot with a friendly smile, or A cat wearing sunglasses..."
-                  className="w-full h-24 px-4 py-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-xl text-white placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
-                />
-                <p className="text-xs text-[var(--text-muted)] mt-2">
-                  Be specific! The better you describe it, the better the remix.
-                </p>
-              </div>
-
-              {/* Brand colors */}
-              <div className="card p-6">
-                <label className="block text-sm font-medium text-white mb-3">
-                  Brand Colors
-                </label>
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={profile.brandColors.primary}
-                      onChange={(e) => setProfile(prev => ({ 
-                        ...prev, 
-                        brandColors: { ...prev.brandColors, primary: e.target.value }
-                      }))}
-                      className="w-10 h-10 rounded-lg cursor-pointer border-0"
-                    />
-                    <span className="text-sm text-[var(--text-secondary)]">Primary</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={profile.brandColors.secondary}
-                      onChange={(e) => setProfile(prev => ({ 
-                        ...prev, 
-                        brandColors: { ...prev.brandColors, secondary: e.target.value }
-                      }))}
-                      className="w-10 h-10 rounded-lg cursor-pointer border-0"
-                    />
-                    <span className="text-sm text-[var(--text-secondary)]">Secondary</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Art style */}
-              <div className="card p-6">
-                <label className="block text-sm font-medium text-white mb-3">
-                  Art Style
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {['cartoon', 'realistic', 'anime', 'sketch', 'pixel', 'minimalist'].map((style) => (
-                    <button
-                      key={style}
-                      onClick={() => setProfile(prev => ({ ...prev, characterStyle: style }))}
-                      className={`py-2 px-3 rounded-lg text-sm capitalize transition-all ${
-                        profile.characterStyle === style
-                          ? 'bg-[var(--accent)] text-white'
-                          : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/80'
-                      }`}
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={() => setStep('select')}
-                disabled={!profile.avatarDescription.trim()}
-                className="w-full py-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Continue to Template Selection →
-              </button>
-            </div>
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        {/* Hero */}
+        {step === 'mode' && (
+          <div className="text-center mb-8 fade-in">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
+              Meme Remix Studio
+            </h1>
+            <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
+              Take any popular meme and make it fresh. Change the style, context, 
+              mashup two memes, or create something entirely new.
+            </p>
           </div>
         )}
 
-        {/* Step 2: Select Template */}
-        {step === 'select' && (
-          <div className="space-y-8 fade-in">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-white mb-2">Choose a Meme to Remix</h1>
-              <p className="text-[var(--text-secondary)]">
-                Select a popular meme template to personalize with your character
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {REMIX_TEMPLATES.map((template) => (
+        {/* Step 1: Choose Remix Mode */}
+        {step === 'mode' && (
+          <div className="space-y-6 fade-in">
+            <h2 className="text-xl font-semibold text-white text-center">How do you want to remix?</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {REMIX_MODES.map((mode) => (
                 <button
-                  key={template.id}
-                  onClick={() => setSelectedTemplate(template)}
-                  className={`card p-3 text-left transition-all hover:scale-[1.02] ${
-                    selectedTemplate?.id === template.id
-                      ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10'
-                      : ''
-                  }`}
+                  key={mode.id}
+                  onClick={() => {
+                    setSelectedMode(mode);
+                    setStep('meme');
+                  }}
+                  className="card p-5 text-left hover:scale-[1.02] transition-all group"
                 >
-                  <div className="aspect-square rounded-lg overflow-hidden bg-[var(--bg-tertiary)] mb-2">
-                    <Image
-                      src={template.previewUrl}
-                      alt={template.name}
-                      width={300}
-                      height={300}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="flex items-start gap-3">
+                    <span className="text-3xl">{mode.icon}</span>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-white group-hover:text-[var(--accent)] transition-colors">
+                        {mode.name}
+                      </h3>
+                      <p className="text-sm text-[var(--text-secondary)] mt-1">
+                        {mode.description}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {mode.examples.slice(0, 2).map((ex, i) => (
+                          <span key={i} className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-muted)]">
+                            {ex}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="font-medium text-white text-sm">{template.name}</h3>
-                  <p className="text-xs text-[var(--text-muted)] line-clamp-1">{template.description}</p>
                 </button>
               ))}
             </div>
-
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setStep('profile')}
-                className="py-3 px-6 bg-[var(--bg-tertiary)] text-white rounded-xl hover:bg-[var(--bg-tertiary)]/80 transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={() => setStep('generate')}
-                disabled={!selectedTemplate}
-                className="py-3 px-6 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Continue to Preview →
-              </button>
-            </div>
           </div>
         )}
 
-        {/* Step 3: Generate */}
-        {step === 'generate' && (
-          <div className="space-y-8 fade-in">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-white mb-2">Ready to Remix!</h1>
-              <p className="text-[var(--text-secondary)]">
-                Review your settings and generate your personalized meme
-              </p>
+        {/* Step 2: Choose Base Meme */}
+        {step === 'meme' && (
+          <div className="space-y-6 fade-in">
+            <div className="flex items-center justify-between">
+              <button onClick={() => setStep('mode')} className="text-[var(--text-secondary)] hover:text-white">
+                ← Back
+              </button>
+              <div className="text-center">
+                <span className="text-2xl mr-2">{selectedMode?.icon}</span>
+                <span className="text-white font-medium">{selectedMode?.name}</span>
+              </div>
+              <div className="w-16" />
             </div>
 
-            <div className="max-w-xl mx-auto space-y-6">
-              {/* Preview card */}
-              <div className="card p-6 space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--bg-tertiary)]">
-                    <Image
-                      src={selectedTemplate?.previewUrl || ''}
-                      alt="Template"
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-white">{selectedTemplate?.name}</h3>
-                    <p className="text-sm text-[var(--text-muted)]">{selectedTemplate?.description}</p>
+            <h2 className="text-xl font-semibold text-white text-center">
+              {selectedMode?.id === 'mashup' && secondMeme 
+                ? 'Now pick the second meme to mashup'
+                : 'Pick a meme to remix'}
+            </h2>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {REMIXABLE_MEMES.map((meme) => {
+                const isSelected = selectedMeme?.id === meme.id;
+                const isSecond = secondMeme?.id === meme.id;
+                const disabled = selectedMode?.id === 'mashup' && selectedMeme?.id === meme.id;
+                
+                return (
+                  <button
+                    key={meme.id}
+                    onClick={() => {
+                      if (disabled) return;
+                      if (selectedMode?.id === 'mashup' && selectedMeme && !secondMeme) {
+                        setSecondMeme(meme);
+                        setStep('customize');
+                      } else {
+                        setSelectedMeme(meme);
+                        if (selectedMode?.id === 'mashup') {
+                          // Stay on meme selection for second meme
+                        } else {
+                          setStep('customize');
+                        }
+                      }
+                    }}
+                    disabled={disabled}
+                    className={`card p-2 transition-all ${
+                      isSelected || isSecond
+                        ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10'
+                        : disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'
+                    }`}
+                  >
+                    <div className="aspect-square rounded overflow-hidden bg-[var(--bg-tertiary)] mb-2 relative">
+                      <Image
+                        src={meme.url}
+                        alt={meme.name}
+                        width={200}
+                        height={200}
+                        className="w-full h-full object-cover"
+                      />
+                      {(isSelected || isSecond) && (
+                        <div className="absolute inset-0 bg-[var(--accent)]/20 flex items-center justify-center">
+                          <span className="text-2xl">{isSelected ? '1️⃣' : '2️⃣'}</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-white font-medium truncate">{meme.name}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedMode?.id === 'mashup' && selectedMeme && !secondMeme && (
+              <p className="text-center text-[var(--text-secondary)]">
+                ✓ First meme selected: <span className="text-white">{selectedMeme.name}</span>. Now pick the second one!
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Step 3: Customize the Remix */}
+        {step === 'customize' && (
+          <div className="space-y-6 fade-in">
+            <div className="flex items-center justify-between">
+              <button onClick={() => {
+                if (selectedMode?.id === 'mashup') {
+                  setSecondMeme(null);
+                }
+                setStep('meme');
+              }} className="text-[var(--text-secondary)] hover:text-white">
+                ← Back
+              </button>
+              <div className="text-center">
+                <span className="text-lg font-medium text-white">{selectedMeme?.name}</span>
+                {secondMeme && <span className="text-[var(--text-secondary)]"> + {secondMeme.name}</span>}
+              </div>
+              <div className="w-16" />
+            </div>
+
+            <div className="max-w-2xl mx-auto">
+              {/* Style Transfer Options */}
+              {selectedMode?.id === 'style' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">Choose an art style</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {ART_STYLES.map((style) => (
+                      <button
+                        key={style.id}
+                        onClick={() => setSelectedStyle(style.id)}
+                        className={`card p-4 text-center transition-all ${
+                          selectedStyle === style.id
+                            ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10'
+                            : 'hover:bg-[var(--bg-tertiary)]'
+                        }`}
+                      >
+                        <span className="text-2xl block mb-1">{style.icon}</span>
+                        <span className="text-sm text-white font-medium">{style.name}</span>
+                        <span className="text-xs text-[var(--text-muted)] block mt-1">{style.description}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                <div className="border-t border-[var(--border)] pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Your character:</span>
-                    <span className="text-white">{profile.avatarDescription.slice(0, 30)}...</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Style:</span>
-                    <span className="text-white capitalize">{profile.characterStyle}</span>
-                  </div>
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-[var(--text-muted)]">Colors:</span>
-                    <div className="flex gap-1">
-                      <div 
-                        className="w-5 h-5 rounded" 
-                        style={{ backgroundColor: profile.brandColors.primary }}
-                      />
-                      <div 
-                        className="w-5 h-5 rounded" 
-                        style={{ backgroundColor: profile.brandColors.secondary }}
-                      />
+              {/* Context Remix */}
+              {selectedMode?.id === 'context' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">Describe the new context</h2>
+                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                    Same joke structure ({selectedMeme?.structure}), different setting
+                  </p>
+                  <textarea
+                    value={contextDescription}
+                    onChange={(e) => setContextDescription(e.target.value)}
+                    placeholder="e.g., 'In a medieval fantasy setting', 'With programming languages instead of people', 'In an office environment with different departments', 'With cats as all the characters'..."
+                    className="w-full h-32 px-4 py-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-xl text-white placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+                  />
+                </div>
+              )}
+
+              {/* Mashup - show selected memes */}
+              {selectedMode?.id === 'mashup' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">Mashup Preview</h2>
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="text-center">
+                      <div className="w-32 h-32 rounded-lg overflow-hidden bg-[var(--bg-tertiary)]">
+                        <Image src={selectedMeme?.url || ''} alt="Meme 1" width={128} height={128} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-sm text-white mt-2">{selectedMeme?.name}</p>
+                    </div>
+                    <span className="text-3xl">🔀</span>
+                    <div className="text-center">
+                      <div className="w-32 h-32 rounded-lg overflow-hidden bg-[var(--bg-tertiary)]">
+                        <Image src={secondMeme?.url || ''} alt="Meme 2" width={128} height={128} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-sm text-white mt-2">{secondMeme?.name}</p>
                     </div>
                   </div>
+                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                    We&apos;ll combine the essence of both memes into something new
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {/* Modernize */}
+              {selectedMode?.id === 'modernize' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">What modern topic?</h2>
+                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                    Update this classic meme for 2024+ themes
+                  </p>
+                  <textarea
+                    value={modernTopic}
+                    onChange={(e) => setModernTopic(e.target.value)}
+                    placeholder="e.g., 'AI and ChatGPT', 'Work from home culture', 'Social media addiction', 'Crypto/NFTs', 'Dating apps', 'Climate anxiety'..."
+                    className="w-full h-32 px-4 py-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-xl text-white placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+                  />
+                </div>
+              )}
+
+              {/* Subvert */}
+              {selectedMode?.id === 'subvert' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">How should we flip it?</h2>
+                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                    Subvert the expected meaning of {selectedMeme?.name}
+                  </p>
+                  <textarea
+                    value={subversionTwist}
+                    onChange={(e) => setSubversionTwist(e.target.value)}
+                    placeholder="e.g., 'Make it wholesome instead of sarcastic', 'Reverse which option is good/bad', 'Make the usually-wrong character right', 'Add a positive twist to negative format'..."
+                    className="w-full h-32 px-4 py-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-xl text-white placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+                  />
+                </div>
+              )}
+
+              {/* Genre/Aesthetic */}
+              {selectedMode?.id === 'genre' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">Choose an aesthetic</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {AESTHETICS.map((aes) => (
+                      <button
+                        key={aes.id}
+                        onClick={() => setSelectedAesthetic(aes.id)}
+                        className={`card p-4 text-left transition-all ${
+                          selectedAesthetic === aes.id
+                            ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/10'
+                            : 'hover:bg-[var(--bg-tertiary)]'
+                        }`}
+                      >
+                        <span className="text-sm text-white font-medium">{aes.name}</span>
+                        <span className="text-xs text-[var(--text-muted)] block mt-1">{aes.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom */}
+              {selectedMode?.id === 'custom' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-white text-center">Describe your vision</h2>
+                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                    Be creative! Describe exactly how you want to remix {selectedMeme?.name}
+                  </p>
+                  <textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    placeholder="e.g., 'Make it look like a Renaissance painting but keep the meme energy', 'Replace all characters with cats in business suits', 'Turn it into a motivational poster', 'Make it look like a movie poster'..."
+                    className="w-full h-40 px-4 py-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-xl text-white placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+                  />
+                </div>
+              )}
 
               {error && (
                 <div className="p-4 card bg-red-500/10 border-red-500/30 text-red-400 text-center">
@@ -417,43 +549,40 @@ export default function RemixStudio() {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-4">
                 <button
-                  onClick={() => setStep('select')}
+                  onClick={() => setStep('meme')}
                   className="flex-1 py-3 bg-[var(--bg-tertiary)] text-white rounded-xl hover:bg-[var(--bg-tertiary)]/80 transition-colors"
                 >
-                  ← Back
+                  ← Change Meme
                 </button>
                 <button
                   onClick={handleGenerateRemix}
-                  disabled={isGenerating}
+                  disabled={!canProceedFromCustomize() || isGenerating}
                   className="flex-1 py-3 btn-primary disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Generating...
+                      Creating...
                     </span>
                   ) : (
                     '✨ Generate Remix'
                   )}
                 </button>
               </div>
-
-              <p className="text-xs text-center text-[var(--text-muted)]">
-                Generation typically takes 10-20 seconds
-              </p>
             </div>
           </div>
         )}
 
         {/* Step 4: Result */}
         {step === 'result' && generatedImage && (
-          <div className="space-y-8 fade-in">
+          <div className="space-y-6 fade-in">
             <div className="text-center">
-              <h1 className="text-3xl font-bold text-white mb-2">Your Remix is Ready! 🎉</h1>
+              <h1 className="text-2xl font-bold text-white mb-2">Your Remix is Ready! 🎉</h1>
               <p className="text-[var(--text-secondary)]">
-                Download and share your personalized meme
+                {selectedMode?.name} of {selectedMeme?.name}
+                {secondMeme && ` + ${secondMeme.name}`}
               </p>
             </div>
 
@@ -474,11 +603,11 @@ export default function RemixStudio() {
                 <button
                   onClick={() => {
                     setGeneratedImage(null);
-                    setStep('select');
+                    setStep('customize');
                   }}
                   className="flex-1 py-3 bg-[var(--bg-tertiary)] text-white rounded-xl hover:bg-[var(--bg-tertiary)]/80 transition-colors"
                 >
-                  🔄 Try Another Template
+                  🎲 Regenerate
                 </button>
                 <button
                   onClick={handleDownload}
@@ -488,25 +617,12 @@ export default function RemixStudio() {
                 </button>
               </div>
 
-              <div className="flex gap-3 mt-3">
-                <button
-                  onClick={() => {
-                    setGeneratedImage(null);
-                    setSelectedTemplate(null);
-                    setStep('profile');
-                  }}
-                  className="flex-1 py-3 bg-[var(--bg-tertiary)] text-white rounded-xl hover:bg-[var(--bg-tertiary)]/80 transition-colors text-sm"
-                >
-                  ← Change Character
-                </button>
-                <button
-                  onClick={handleGenerateRemix}
-                  disabled={isGenerating}
-                  className="flex-1 py-3 bg-[var(--bg-tertiary)] text-white rounded-xl hover:bg-[var(--bg-tertiary)]/80 transition-colors text-sm"
-                >
-                  🎲 Regenerate
-                </button>
-              </div>
+              <button
+                onClick={resetToStart}
+                className="w-full mt-3 py-3 bg-[var(--bg-tertiary)] text-white rounded-xl hover:bg-[var(--bg-tertiary)]/80 transition-colors"
+              >
+                🔄 Start New Remix
+              </button>
             </div>
           </div>
         )}
