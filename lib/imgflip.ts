@@ -23,6 +23,20 @@ export type MemeHumorTag =
   | 'nostalgia'
   | 'relatable';
 
+// NEW: Topic/context tags for better matching
+export type MemeTopicTag = 
+  | 'tech'
+  | 'work'
+  | 'relationships'
+  | 'food'
+  | 'money'
+  | 'health'
+  | 'gaming'
+  | 'social-media'
+  | 'education'
+  | 'politics'
+  | 'universal';  // Works for any topic
+
 // Detailed meme format info for better AI matching
 export interface MemeFormatInfo {
   id: string;
@@ -32,6 +46,7 @@ export interface MemeFormatInfo {
   description: string;
   bestFor: string;
   humorTags?: MemeHumorTag[];  // MM-005: Optional humor tags
+  topicTags?: MemeTopicTag[];  // NEW: Topic/context tags
   exampleCaptions?: string[]; // MM-006: Example captions for few-shot learning
   textBoxes: Array<{
     position: 'top' | 'bottom' | 'left' | 'right' | 'center' | 'panel1' | 'panel2' | 'panel3' | 'panel4';
@@ -49,7 +64,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Drake disapproving something (top), then approving alternative (bottom)',
     bestFor: 'Showing preference, rejecting one thing for another, ONLY when tweet has two alternatives to compare',
     humorTags: ['comparison'],
-    exampleCaptions: ['Top: Reading documentation / Bottom: Asking ChatGPT', 'Top: Going to the gym / Bottom: Buying new workout clothes'],
+    topicTags: ['universal'],
+    exampleCaptions: [
+      'Top: Reading documentation / Bottom: Asking ChatGPT',
+      'Top: Going to the gym / Bottom: Buying new workout clothes',
+      'Top: 8 hours of sleep / Bottom: Doom scrolling until 3am',
+      'Top: Saving money / Bottom: "Treat yourself"',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Thing being rejected/disliked' },
       { position: 'bottom', purpose: 'Thing being preferred/approved' },
@@ -61,7 +82,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Regular Pooh vs Fancy Pooh',
     bestFor: 'Fancier/pretentious way of saying the SAME thing, upgrades, sophistication',
     humorTags: ['comparison', 'sarcasm'],
-    exampleCaptions: ['Top: Nap / Bottom: Horizontal life pause', 'Top: Bug / Bottom: Undocumented feature'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Top: Nap / Bottom: Horizontal life pause',
+      'Top: Bug / Bottom: Undocumented feature',
+      'Top: Copy-paste from Stack Overflow / Bottom: Leveraging community solutions',
+      'Top: Unemployed / Bottom: Between opportunities',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Normal/basic version' },
       { position: 'bottom', purpose: 'Fancy/elevated version' },
@@ -73,7 +100,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Strong doge (past) vs weak doge (present)',
     bestFor: 'Then vs now comparisons, things getting worse over time, nostalgia about how things used to be better',
     humorTags: ['comparison', 'nostalgia', 'self-deprecation'],
-    exampleCaptions: ['Left: Devs in 2010 / Right: Devs asking AI to write a for loop', 'Left: Ancient philosophers / Right: Me deciding what to eat'],
+    topicTags: ['universal', 'tech', 'gaming'],
+    exampleCaptions: [
+      'Left: Devs in 2010 / Right: Devs asking AI to write a for loop',
+      'Left: Ancient philosophers / Right: Me deciding what to eat',
+      'Left: Phones in 2010 (lasted a week) / Right: Phones now (needs charging twice)',
+      'Left: Weekend plans / Right: Weekend reality',
+    ],
     textBoxes: [
       { position: 'left', purpose: 'How things were (strong)' },
       { position: 'right', purpose: 'How things are now (weak)' },
@@ -85,7 +118,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Person sweating while choosing between two buttons',
     bestFor: 'Impossible choices, dilemmas, when BOTH options are tempting or terrible',
     humorTags: ['relatable', 'absurdist', 'self-deprecation'],
-    exampleCaptions: ['Button 1: Sleep / Button 2: One more episode / Guy: Me at 2am'],
+    topicTags: ['universal', 'work', 'relationships'],
+    exampleCaptions: [
+      'Button 1: Sleep / Button 2: One more episode / Guy: Me at 2am',
+      'Button 1: Save money / Button 2: Concert tickets / Guy: My wallet',
+      'Button 1: Reply to emails / Button 2: Start new project / Guy: Developers',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'First option (button)' },
       { position: 'panel2', purpose: 'Second option (button)' },
@@ -98,7 +136,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Guy looking at another woman while girlfriend looks disapprovingly',
     bestFor: 'Being distracted by something shiny/new, abandoning responsibilities, temptation pulling away from duties',
     humorTags: ['comparison', 'relatable', 'self-deprecation'],
-    exampleCaptions: ['GF: My responsibilities / Me / Other woman: New side project'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'GF: My responsibilities / Me / Other woman: New side project',
+      'GF: Current tech stack / Company / Other woman: Shiny new framework',
+      'GF: Sleep / Me / Other woman: That thing I said 5 years ago',
+    ],
     textBoxes: [
       { position: 'left', purpose: 'Current thing being neglected (girlfriend)' },
       { position: 'center', purpose: 'Who/what is being distracted (boyfriend)' },
@@ -111,7 +154,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Two arms doing epic handshake, united by common ground',
     bestFor: 'Two different groups agreeing on something, unlikely allies, finding common ground between opposites',
     humorTags: ['observation', 'relatable', 'wholesome'],
-    exampleCaptions: ['Left: Frontend devs / Right: Backend devs / Hands: Blaming QA'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Left: Frontend devs / Right: Backend devs / Hands: Blaming QA',
+      'Left: Cats / Right: Dogs / Hands: Hating the vacuum',
+      'Left: Introverts / Right: Extroverts / Hands: Disliking phone calls',
+    ],
     textBoxes: [
       { position: 'left', purpose: 'First group/person' },
       { position: 'center', purpose: 'What they agree on (handshake)' },
@@ -149,7 +197,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Pikachu with shocked face',
     bestFor: 'ONLY for predictable outcomes - "does X" → "X happens" → shocked. The outcome must be OBVIOUS from the action',
     humorTags: ['irony', 'sarcasm'],
-    exampleCaptions: ['Top: Eats entire pizza / Bottom: Gets stomachache', 'Top: Skips all tests / Bottom: Code breaks in prod'],
+    topicTags: ['universal'],
+    exampleCaptions: [
+      'Top: Eats entire pizza / Bottom: Gets stomachache',
+      'Top: Skips all tests / Bottom: Code breaks in prod',
+      'Top: Never backs up files / Bottom: Hard drive crashes',
+      'Top: Ignores all red flags / Bottom: Relationship explodes',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Action with obvious consequence' },
       { position: 'bottom', purpose: 'The obvious consequence happens' },
@@ -161,7 +215,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Astronaut realizing truth, other astronaut with gun saying "Always has been"',
     bestFor: 'Revealing something was ALWAYS true, not a recent change. "Wait X is Y?" "Always has been"',
     humorTags: ['irony', 'observation'],
-    exampleCaptions: ['Top: Wait, meetings are just emails? / Bottom: Always has been'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Top: Wait, meetings are just emails? / Bottom: Always has been',
+      'Top: Wait, its all just Googling? / Bottom: Always has been',
+      'Top: Wait, adulting is just pretending? / Bottom: Always has been',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The realization/question "Wait, its all X?"' },
       { position: 'bottom', purpose: '"Always has been" confirmation' },
@@ -172,6 +231,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Batman slapping Robin mid-sentence',
     bestFor: 'Shutting down bad takes/stupid comments, interrupting nonsense, hard corrections',
+    humorTags: ['roast', 'complaint'],
+    topicTags: ['universal'],
+    exampleCaptions: [
+      'Top: I think pineapple on pizza is-- / Bottom: *SLAP*',
+      'Top: AI will replace all program-- / Bottom: Have you tried debugging AI code?',
+      'Top: Just use regex to parse HT-- / Bottom: NO',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Wrong/annoying thing being said' },
       { position: 'bottom', purpose: 'The slap/correction response' },
@@ -254,10 +320,15 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Person puts stick in own bike wheel and falls',
     bestFor: 'Self-sabotage, causing your own problems then blaming others, ironic self-destruction',
     humorTags: ['self-deprecation', 'irony'],
-    exampleCaptions: ['Panel 1: Me / Panel 2: Not studying / Panel 3: Why am I failing?'],
+    topicTags: ['universal', 'work', 'relationships'],
+    exampleCaptions: [
+      'Panel 1: Me / Panel 2: Not studying / Panel 3: Why am I failing?',
+      'Panel 1: Companies / Panel 2: Underpaying workers / Panel 3: Why is no one loyal?',
+      'Panel 1: Me / Panel 2: Eating junk food at midnight / Panel 3: Why cant I sleep?',
+    ],
     textBoxes: [
-      { position: 'panel1', purpose: 'Action causing the problem' },
-      { position: 'panel2', purpose: 'The self-sabotage' },
+      { position: 'panel1', purpose: 'Who/what causes the problem' },
+      { position: 'panel2', purpose: 'The self-sabotaging action' },
       { position: 'panel3', purpose: 'Blaming something else / confused reaction' },
     ],
   },
@@ -267,7 +338,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     description: 'Dog sitting in burning room saying "This is fine"',
     bestFor: 'Ignoring obvious problems, denial in crisis, pretending everything is okay when its not',
     humorTags: ['sarcasm', 'relatable'],
-    exampleCaptions: ['Top: 47 unread emails / Bottom: This is fine'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Top: 47 unread emails / Bottom: This is fine',
+      'Top: Production is down / Bottom: This is fine',
+      'Top: Bank account at $3.47 / Bottom: This is fine',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The disaster/problem' },
       { position: 'bottom', purpose: '"This is fine" / acceptance' },
@@ -278,6 +354,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Person progressively applying clown makeup',
     bestFor: 'Making yourself look like a fool step by step, escalating bad decisions, self-own',
+    humorTags: ['self-deprecation', 'irony'],
+    topicTags: ['universal', 'relationships', 'work'],
+    exampleCaptions: [
+      'Panel 1: They seem nice / Panel 2: Red flag #1 / Panel 3: Red flag #2 / Panel 4: Why does this keep happening to me?',
+      'Panel 1: I will go to bed early / Panel 2: Just one more video / Panel 3: Its only 11pm / Panel 4: 4am alarm',
+      'Panel 1: This will be a quick fix / Panel 2: Just need to refactor this / Panel 3: Actually the whole system / Panel 4: Starting from scratch',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'First bad decision' },
       { position: 'panel2', purpose: 'Second bad decision' },
@@ -313,6 +396,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'label',
     description: 'Steven Crowder sitting at table with sign saying "Change My Mind"',
     bestFor: 'Hot takes, controversial opinions stated as facts, confident assertions',
+    humorTags: ['hot-take', 'observation'],
+    topicTags: ['universal', 'tech', 'food'],
+    exampleCaptions: [
+      'Tabs are better than spaces. Change my mind.',
+      'Cereal is just cold soup. Change my mind.',
+      'Most meetings could be emails. Change my mind.',
+    ],
     textBoxes: [
       { position: 'center', purpose: 'Your controversial opinion' },
     ],
@@ -340,6 +430,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Anakin tells Padme something, she asks follow-up, he stares ominously',
     bestFor: 'Revealing bad intentions, "right?" moments, when follow-up question exposes the truth',
+    humorTags: ['irony', 'sarcasm'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Panel 1: We will deploy Friday / Panel 2: And test it first right? / Panel 3: ... / Panel 4: Right??',
+      'Panel 1: The feature is almost done / Panel 2: With documentation right? / Panel 3: ... / Panel 4: RIGHT??',
+      'Panel 1: I sent the email / Panel 2: After proofreading right? / Panel 3: ... / Panel 4: RIGHT??',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Initial statement' },
       { position: 'panel2', purpose: 'Follow-up question "Right?"' },
@@ -354,6 +451,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Brain getting bigger with increasingly "enlightened" ideas',
     bestFor: 'Escalating absurdity on ONE topic, progression from normal to galaxy brain',
+    humorTags: ['absurdist', 'sarcasm'],
+    topicTags: ['universal', 'tech'],
+    exampleCaptions: [
+      'Panel 1: Using if/else / Panel 2: Using switch / Panel 3: Using ternary / Panel 4: One-liner regex',
+      'Panel 1: Reading the manual / Panel 2: Watching a tutorial / Panel 3: Trial and error / Panel 4: Asking AI to do it',
+      'Panel 1: Planning ahead / Panel 2: Winging it / Panel 3: Panic / Panel 4: It works idk why',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Normal/basic approach' },
       { position: 'panel2', purpose: 'Slightly "smarter" approach' },
@@ -377,6 +481,13 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Three panel: panic, calm, panic again',
     bestFor: 'Emotional rollercoaster, false sense of security, relief turning to panic',
+    humorTags: ['relatable', 'absurdist'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Panel 1: Deploy fails / Panel 2: Its the staging server / Panel 3: Wait which server is staging',
+      'Panel 1: Phone at 5% / Panel 2: Found a charger / Panel 3: Its USB-C',
+      'Panel 1: Deadline tomorrow / Panel 2: Almost done / Panel 3: Client changed requirements',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Initial panic situation' },
       { position: 'panel2', purpose: 'Why you calm down' },
@@ -411,11 +522,18 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Gru presenting plan, last panel shows unexpected bad outcome',
     bestFor: 'Plans going wrong, unexpected consequences, "wait what" realizations',
+    humorTags: ['irony', 'self-deprecation'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Panel 1: Learn to code / Panel 2: Get a tech job / Panel 3: Spend all day in meetings / Panel 4: Spend all day in meetings',
+      'Panel 1: Start a side project / Panel 2: Get really into it / Panel 3: Never finish it / Panel 4: Never finish it',
+      'Panel 1: Go to bed early / Panel 2: Wake up refreshed / Panel 3: Check phone once / Panel 4: Check phone once (its 3am)',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Step 1 of plan' },
       { position: 'panel2', purpose: 'Step 2 of plan' },
       { position: 'panel3', purpose: 'Unexpected bad outcome' },
-      { position: 'panel4', purpose: 'Realizing the bad outcome' },
+      { position: 'panel4', purpose: 'Realizing the bad outcome (same text as panel 3)' },
     ],
   },
   '91545132': { // Trump Bill Signing
@@ -902,6 +1020,8 @@ export interface ScoringInput {
   hasObviousOutcome: boolean;
   isSelfSabotage: boolean;
   sentiment: string;
+  topics?: string[];  // NEW: Tweet topics for better matching
+  hasMultipleSteps?: boolean;  // NEW: For multi-panel meme preference
 }
 
 export function scoreTemplates(
@@ -927,6 +1047,22 @@ export function scoreTemplates(
       reasons.push(`Matches secondary humor: ${input.secondaryHumorType}`);
     }
 
+    // NEW: Score based on topic match
+    if (input.topics && input.topics.length > 0 && formatInfo.topicTags) {
+      const matchingTopics = input.topics.filter(t => 
+        formatInfo.topicTags?.includes(t as MemeTopicTag)
+      );
+      if (matchingTopics.length > 0) {
+        score += 15 * matchingTopics.length;
+        reasons.push(`Topic match: ${matchingTopics.join(', ')}`);
+      }
+      // Universal templates get a small bonus if no specific match
+      if (matchingTopics.length === 0 && formatInfo.topicTags.includes('universal')) {
+        score += 5;
+        reasons.push('Universal template');
+      }
+    }
+
     // Comparison memes need two alternatives
     if (formatInfo.format === 'comparison') {
       if (input.hasTwoAlternatives) {
@@ -942,6 +1078,12 @@ export function scoreTemplates(
     if (formatInfo.format === 'reaction' && input.hasObviousOutcome) {
       score += 20;
       reasons.push('Obvious outcome fits reaction format');
+    }
+
+    // NEW: Multi-panel memes for multi-step content
+    if (input.hasMultipleSteps && formatInfo.format === 'multi-panel') {
+      score += 25;
+      reasons.push('Multi-step content fits multi-panel format');
     }
 
     // Bike Fall and self-deprecation memes
@@ -969,6 +1111,12 @@ export function scoreTemplates(
     if (MEME_FORMAT_DATABASE[template.id]) {
       score += 10;
       reasons.push('Curated template with rich metadata');
+    }
+
+    // NEW: Bonus for templates with example captions (better few-shot learning)
+    if (formatInfo.exampleCaptions && formatInfo.exampleCaptions.length >= 2) {
+      score += 5;
+      reasons.push('Has example captions for better results');
     }
 
     scores.push({

@@ -102,9 +102,66 @@
       ],
       "priority": 7,
       "passes": false
+    },
+    {
+      "id": "MM-008",
+      "title": "Multi-panel meme caption support",
+      "description": "Properly generate captions for multi-panel memes (3-4 text boxes) like Gru's Plan, Clown Applying Makeup, Expanding Brain, etc.",
+      "acceptanceCriteria": [
+        "Update generateCaptions() to request panel1/panel2/panel3/panel4 texts",
+        "Build textBoxes array dynamically based on template format",
+        "Include panel-specific instructions in the prompt",
+        "Fallback to top/bottom if panels not provided"
+      ],
+      "priority": 8,
+      "passes": true,
+      "completedAt": "2026-01-16"
+    },
+    {
+      "id": "MM-009",
+      "title": "Topic/context tags for better matching",
+      "description": "Add topic tags to templates (tech, work, relationships, food, money, etc) and detect tweet topics for better template matching.",
+      "acceptanceCriteria": [
+        "Add MemeTopicTag type with categories",
+        "Add topicTags to template database",
+        "Detect topics in tweet analysis",
+        "Score templates based on topic match"
+      ],
+      "priority": 9,
+      "passes": true,
+      "completedAt": "2026-01-16"
+    },
+    {
+      "id": "MM-010",
+      "title": "Result diversity enforcement",
+      "description": "Ensure the 3 returned meme suggestions use different formats - no returning 3 comparison memes for every tweet.",
+      "acceptanceCriteria": [
+        "Create enforceDiversity() function",
+        "Max 2 templates of same format in results",
+        "Add diversity instruction to AI prompt",
+        "Fill remaining slots with different formats"
+      ],
+      "priority": 10,
+      "passes": true,
+      "completedAt": "2026-01-16"
+    },
+    {
+      "id": "MM-011",
+      "title": "Caption tone/style variants",
+      "description": "Generate captions with different tones (deadpan, exaggerated, absurdist, wholesome, savage) so each meme suggestion feels distinct.",
+      "acceptanceCriteria": [
+        "Define CaptionTone type with 5 styles",
+        "Create TONE_INSTRUCTIONS with style guidance",
+        "Assign different tones to each template",
+        "Include tone instructions in caption prompt"
+      ],
+      "priority": 11,
+      "passes": true,
+      "completedAt": "2026-01-16"
     }
   ],
   "progress": [
-    {"date": "2026-01-16", "completed": ["MM-001", "MM-002", "MM-003", "MM-004", "MM-005", "MM-006"]}
+    {"date": "2026-01-16", "completed": ["MM-001", "MM-002", "MM-003", "MM-004", "MM-005", "MM-006"]},
+    {"date": "2026-01-16", "completed": ["MM-008", "MM-009", "MM-010", "MM-011"]}
   ]
 }

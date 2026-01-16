@@ -50,6 +50,20 @@ export type HumorType =
 
 export type Sentiment = 'positive' | 'negative' | 'neutral' | 'sarcastic' | 'mixed';
 
+// NEW: Topic detection for better template matching
+export type TweetTopic = 
+  | 'tech'
+  | 'work'
+  | 'relationships'
+  | 'food'
+  | 'money'
+  | 'health'
+  | 'gaming'
+  | 'social-media'
+  | 'education'
+  | 'politics'
+  | 'universal';
+
 export interface TweetAnalysis {
   sentiment: Sentiment;
   humorType: HumorType;
@@ -59,6 +73,8 @@ export interface TweetAnalysis {
   hasTwoAlternatives: boolean;
   hasObviousOutcome: boolean;
   isSelfSabotage: boolean;
+  topics?: TweetTopic[];  // NEW: Detected topics
+  hasMultipleSteps?: boolean;  // NEW: For multi-panel memes
 }
 
 // MM-001: Analyze tweet before matching
@@ -76,7 +92,9 @@ Analyze and return JSON with these fields:
   "corePoint": the main joke or point in ONE short sentence (max 15 words),
   "hasTwoAlternatives": true if comparing two distinct options (for Drake/comparison memes),
   "hasObviousOutcome": true if there's a predictable cause→effect (for Surprised Pikachu),
-  "isSelfSabotage": true if someone causes their own problem (for Bike Fall)
+  "isSelfSabotage": true if someone causes their own problem (for Bike Fall),
+  "topics": array from ["tech", "work", "relationships", "food", "money", "health", "gaming", "social-media", "education", "politics", "universal"],
+  "hasMultipleSteps": true if the tweet describes a sequence/progression (for multi-panel memes like Gru's Plan, Clown Makeup)
 }
 
 Be precise. The humor type should match what would make this tweet funny as a meme.
@@ -144,6 +162,19 @@ function fallbackAnalyzeTweet(tweet: string): TweetAnalysis {
   const hasTwoAlternatives = /\bvs\b|\bor\b|instead of|rather than/i.test(tweet);
   const hasObviousOutcome = /turns out|shocking|surprised|obviously/i.test(tweet);
   const isSelfSabotage = /blame|fault|caused|my own/i.test(tweet);
+  const hasMultipleSteps = /first|then|finally|step|1\.|2\.|3\./i.test(tweet);
+
+  // NEW: Detect topics from keywords
+  const topics: TweetTopic[] = [];
+  if (/code|programming|software|app|api|bug|deploy|server|ai|tech|computer/i.test(tweet)) topics.push('tech');
+  if (/job|work|boss|meeting|email|office|deadline|coworker|salary/i.test(tweet)) topics.push('work');
+  if (/date|relationship|boyfriend|girlfriend|ex|marriage|love|tinder/i.test(tweet)) topics.push('relationships');
+  if (/food|eat|cook|restaurant|pizza|coffee|drink|hungry/i.test(tweet)) topics.push('food');
+  if (/money|broke|rich|buy|spend|save|invest|budget/i.test(tweet)) topics.push('money');
+  if (/gym|workout|health|sleep|tired|sick|diet/i.test(tweet)) topics.push('health');
+  if (/game|gaming|play|xbox|playstation|nintendo|steam/i.test(tweet)) topics.push('gaming');
+  if (/twitter|instagram|tiktok|social|post|viral|followers/i.test(tweet)) topics.push('social-media');
+  if (topics.length === 0) topics.push('universal');
 
   // Create core point from first sentence
   const firstSentence = tweet.split(/[.!?]/)[0]?.trim() || tweet;
@@ -157,6 +188,8 @@ function fallbackAnalyzeTweet(tweet: string): TweetAnalysis {
     hasTwoAlternatives,
     hasObviousOutcome,
     isSelfSabotage,
+    topics,
+    hasMultipleSteps,
   };
 }
 
@@ -230,6 +263,7 @@ function extractJson(text: string): unknown | null {
 }
 
 // MM-003: Step 1 - Select best template IDs
+// IMPROVED: Now enforces diversity (different formats) and considers topics
 async function selectBestTemplates(
   tweet: string,
   templates: MemeTemplate[],
@@ -241,9 +275,15 @@ async function selectBestTemplates(
     .filter(t => !excludeIds.includes(t.id))
     .map(t => {
       const info = getMemeFormatInfo(t);
-      return `${t.id}: ${t.name} (${info.format}) - ${info.bestFor}`;
+      const topicStr = info.topicTags?.join(', ') || 'universal';
+      return `${t.id}: ${t.name} (${info.format}) - ${info.bestFor} [topics: ${topicStr}]`;
     })
     .join('\n');
+
+  const topicsStr = analysis.topics?.join(', ') || 'general';
+  const multiStepHint = analysis.hasMultipleSteps 
+    ? '\n- Has multiple steps/progression: YES - consider multi-panel memes like Grus Plan, Clown Makeup, Expanding Brain'
+    : '';
 
   const prompt = `Select the ${count} BEST meme templates for this tweet.
 
@@ -253,14 +293,17 @@ ANALYSIS:
 - Humor: ${analysis.humorType}
 - Sentiment: ${analysis.sentiment}
 - Core point: ${analysis.corePoint}
+- Topics: ${topicsStr}
 - Has comparison: ${analysis.hasTwoAlternatives}
 - Has obvious outcome: ${analysis.hasObviousOutcome}
-- Self-sabotage: ${analysis.isSelfSabotage}
+- Self-sabotage: ${analysis.isSelfSabotage}${multiStepHint}
 
 RULES:
 - ONLY comparison memes (Drake, Tuxedo Pooh) if tweet has TWO alternatives
 - Surprised Pikachu ONLY for obvious cause→effect
 - Match the humor type to the template
+- DIVERSITY: Pick templates with DIFFERENT formats (don't pick 3 comparison memes!)
+- Prefer templates matching the tweet's topics
 
 TEMPLATES:
 ${templateList}
@@ -280,31 +323,102 @@ Reply with ONLY a JSON array of ${count} template IDs:
     if (content.type === 'text') {
       const parsed = extractJson(content.text);
       if (Array.isArray(parsed) && parsed.every(id => typeof id === 'string')) {
-        console.log('Selected templates:', parsed);
-        return parsed.slice(0, count);
+        // Enforce diversity: check formats
+        const selectedIds = parsed.slice(0, count);
+        const diversified = enforceDiversity(selectedIds, templates, excludeIds);
+        console.log('Selected templates (with diversity):', diversified);
+        return diversified;
       }
     }
   } catch (error) {
     console.error('Template selection failed:', error);
   }
 
-  // Fallback: return top-scored template IDs
-  return templates.slice(0, count).map(t => t.id);
+  // Fallback: return top-scored template IDs with diversity
+  return enforceDiversity(
+    templates.slice(0, count * 2).map(t => t.id),
+    templates,
+    excludeIds
+  ).slice(0, count);
 }
 
+// NEW: Ensure result diversity - no more than 2 of the same format
+function enforceDiversity(
+  selectedIds: string[],
+  allTemplates: MemeTemplate[],
+  excludeIds: string[]
+): string[] {
+  const formatCounts: Record<string, number> = {};
+  const diverseIds: string[] = [];
+  
+  for (const id of selectedIds) {
+    const template = allTemplates.find(t => t.id === id);
+    if (!template) continue;
+    
+    const format = getMemeFormatInfo(template).format;
+    const currentCount = formatCounts[format] || 0;
+    
+    // Allow max 2 of same format
+    if (currentCount < 2) {
+      diverseIds.push(id);
+      formatCounts[format] = currentCount + 1;
+    }
+  }
+  
+  // If we don't have enough, add from other templates
+  if (diverseIds.length < 3) {
+    const usedFormats = new Set(Object.keys(formatCounts).filter(f => formatCounts[f] >= 2));
+    const alternatives = allTemplates
+      .filter(t => 
+        !diverseIds.includes(t.id) && 
+        !excludeIds.includes(t.id) &&
+        !usedFormats.has(getMemeFormatInfo(t).format)
+      )
+      .slice(0, 3 - diverseIds.length);
+    
+    for (const alt of alternatives) {
+      diverseIds.push(alt.id);
+    }
+  }
+  
+  return diverseIds;
+}
+
+// Caption tone styles for variety
+type CaptionTone = 'deadpan' | 'exaggerated' | 'absurdist' | 'wholesome' | 'savage';
+
+const TONE_INSTRUCTIONS: Record<CaptionTone, string> = {
+  deadpan: 'Use a dry, matter-of-fact tone. No exclamation marks. State things plainly for comedic effect.',
+  exaggerated: 'Amp up the drama! Use hyperbole and dramatic statements. Make it over-the-top.',
+  absurdist: 'Go weird and unexpected. Non-sequiturs welcome. Subvert expectations.',
+  wholesome: 'Keep it light and relatable. Gentle humor that everyone can enjoy.',
+  savage: 'Go hard. Be brutally honest. No holding back on the roast.',
+};
+
 // MM-003: Step 2 - Generate captions for selected templates
+// IMPROVED: Now supports multi-panel memes with 3-4 text boxes and varied tones
 async function generateCaptions(
   tweet: string,
   selectedTemplates: MemeTemplate[],
   analysis: TweetAnalysis
 ): Promise<MemeMatch[]> {
-  const templateDetails = selectedTemplates.map(t => {
+  // Assign different tones to each template for variety
+  const tones: CaptionTone[] = ['deadpan', 'exaggerated', 'absurdist', 'wholesome', 'savage'];
+  const shuffledTones = tones.sort(() => Math.random() - 0.5);
+  
+  const templateDetails = selectedTemplates.map((t, idx) => {
     const info = getMemeFormatInfo(t);
     const examples = info.exampleCaptions?.join(' | ') || 'None';
-    return `Template: ${t.name} (ID: ${t.id})
-Format: ${info.format}
+    const boxesDesc = info.textBoxes.map(b => `${b.position}: ${b.purpose}`).join(', ');
+    const isMultiPanel = info.format === 'multi-panel' || info.textBoxes.length > 2;
+    const assignedTone = shuffledTones[idx % shuffledTones.length];
+    
+    return `Template ${idx + 1}: ${t.name} (ID: ${t.id})
+Format: ${info.format}${isMultiPanel ? ' (MULTI-PANEL - use all boxes!)' : ''}
 How it works: ${info.description}
-Example captions: ${examples}`;
+Text boxes: ${boxesDesc}
+Example captions: ${examples}
+TONE FOR THIS ONE: ${assignedTone.toUpperCase()} - ${TONE_INSTRUCTIONS[assignedTone]}`;
   }).join('\n\n');
 
   const prompt = `Generate perfect captions for these meme templates.
@@ -321,6 +435,8 @@ CAPTION RULES:
 3. Transform the tweet's IDEA - don't copy words
 4. Make it FUNNY and PUNCHY
 5. Each meme should feel fresh and creative
+6. For MULTI-PANEL memes: Fill ALL panels! Use panel1, panel2, panel3, panel4 as needed.
+7. IMPORTANT: Follow the assigned TONE for each template to make them feel different!
 
 Return JSON array:
 [
@@ -328,15 +444,19 @@ Return JSON array:
     "templateId": "exact ID",
     "templateName": "name",
     "reasoning": "Why this works for the humor type",
-    "suggestedTopText": "punchy top text",
-    "suggestedBottomText": "punchy bottom text"
+    "suggestedTopText": "for top/bottom memes",
+    "suggestedBottomText": "for top/bottom memes",
+    "panel1": "for multi-panel (if applicable)",
+    "panel2": "for multi-panel (if applicable)",
+    "panel3": "for multi-panel (if applicable)",
+    "panel4": "for multi-panel (if applicable)"
   }
 ]`;
 
   try {
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: 1200,
       temperature: 0.8,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -348,17 +468,40 @@ Return JSON array:
         return parsed.map(m => {
           const template = selectedTemplates.find(t => t.id === m.templateId);
           const formatInfo = template ? getMemeFormatInfo(template) : null;
+          const isMultiPanel = formatInfo?.format === 'multi-panel' || (formatInfo?.textBoxes.length || 0) > 2;
+          
+          // Build textBoxes based on template format
+          let textBoxes: TextBox[];
+          if (isMultiPanel && (m.panel1 || m.panel2)) {
+            // Multi-panel meme
+            textBoxes = [];
+            if (m.panel1) textBoxes.push({ position: 'panel1', text: String(m.panel1).slice(0, 100) });
+            if (m.panel2) textBoxes.push({ position: 'panel2', text: String(m.panel2).slice(0, 100) });
+            if (m.panel3) textBoxes.push({ position: 'panel3', text: String(m.panel3).slice(0, 100) });
+            if (m.panel4) textBoxes.push({ position: 'panel4', text: String(m.panel4).slice(0, 100) });
+            // Fallback: if no panels but has top/bottom, use those
+            if (textBoxes.length === 0) {
+              textBoxes = [
+                { position: 'top', text: String(m.suggestedTopText || '').slice(0, 100) },
+                { position: 'bottom', text: String(m.suggestedBottomText || '').slice(0, 100) },
+              ];
+            }
+          } else {
+            // Standard top/bottom meme
+            textBoxes = [
+              { position: 'top', text: String(m.suggestedTopText || '').slice(0, 100) },
+              { position: 'bottom', text: String(m.suggestedBottomText || '').slice(0, 100) },
+            ];
+          }
+          
           return {
             templateId: m.templateId,
             templateName: m.templateName || template?.name || 'Meme',
             reasoning: m.reasoning || 'Great match',
-            suggestedTopText: String(m.suggestedTopText || '').slice(0, 100),
-            suggestedBottomText: String(m.suggestedBottomText || '').slice(0, 100),
+            suggestedTopText: String(m.suggestedTopText || m.panel1 || '').slice(0, 100),
+            suggestedBottomText: String(m.suggestedBottomText || m.panel2 || '').slice(0, 100),
             format: formatInfo?.format || 'top-bottom',
-            textBoxes: [
-              { position: 'top', text: String(m.suggestedTopText || '').slice(0, 100) },
-              { position: 'bottom', text: String(m.suggestedBottomText || '').slice(0, 100) },
-            ],
+            textBoxes,
           };
         });
       }
@@ -965,6 +1108,8 @@ export async function matchTweetToMemes(
     hasObviousOutcome: analysis.hasObviousOutcome,
     isSelfSabotage: analysis.isSelfSabotage,
     sentiment: analysis.sentiment,
+    topics: analysis.topics,  // NEW: Pass detected topics
+    hasMultipleSteps: analysis.hasMultipleSteps,  // NEW: Multi-step detection
   };
   
   // Get top 20 scored templates (filtered by excludeIds)
