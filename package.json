@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "fabric": "^7.1.0",
     "next": "16.1.1",
+    "openai": "^6.16.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "stripe": "^20.1.2"

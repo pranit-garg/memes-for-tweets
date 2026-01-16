@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import TweetInput from '@/components/TweetInput';
 import MemeGrid from '@/components/MemeGrid';
 import MemeEditor from '@/components/MemeEditor';
@@ -148,7 +149,15 @@ export default function Home() {
               memes for tweets
             </span>
           </button>
-          <UsageCounter remaining={usage.remaining} isPremium={usage.isPremium} />
+          <div className="flex items-center gap-4">
+            <Link
+              href="/remix"
+              className="px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:opacity-90 transition-opacity"
+            >
+              ✨ Remix Studio
+            </Link>
+            <UsageCounter remaining={usage.remaining} isPremium={usage.isPremium} />
+          </div>
         </div>
       </header>
 
