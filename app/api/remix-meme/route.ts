@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
 
 type RemixMode = 'style' | 'context' | 'mashup' | 'modernize' | 'subvert' | 'genre' | 'custom';
 
@@ -26,7 +25,7 @@ interface RemixRequest {
   subversionTwist?: string;
 }
 
-// Art style descriptions for DALL-E
+// Art style descriptions
 const STYLE_DESCRIPTIONS: Record<string, string> = {
   'pixel': '16-bit pixel art style, retro video game aesthetic, limited color palette, blocky pixels visible',
   'anime': 'anime/manga art style, expressive eyes, dynamic poses, Japanese animation aesthetic',
@@ -177,9 +176,9 @@ Do NOT include text overlays.`;
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.GOOGLE_AI_API_KEY) {
       return NextResponse.json(
-        { error: 'Image generation is not configured. Please add OPENAI_API_KEY.' },
+        { error: 'Image generation is not configured. Please add GOOGLE_AI_API_KEY.' },
         { status: 500 }
       );
     }
@@ -196,25 +195,39 @@ export async function POST(request: NextRequest) {
 
     // Build the prompt based on mode
     const prompt = buildRemixPrompt(body);
-    console.log('Generating remix with prompt:', prompt.slice(0, 300) + '...');
+    console.log('Generating remix with Gemini, prompt:', prompt.slice(0, 300) + '...');
 
-    // Generate with DALL-E 3
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt,
-      n: 1,
-      size: '1024x1024',
-      quality: 'standard',
-      style: 'vivid',
+    // Use Gemini's image generation model (Nano Banana / Imagen 3)
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.0-flash-exp-image-generation',
+      generationConfig: {
+        responseModalities: ['Text', 'Image'],
+      } as never,
     });
 
-    const imageUrl = response.data[0]?.url;
-
-    if (!imageUrl) {
-      throw new Error('No image generated');
+    const response = await model.generateContent(prompt);
+    const result = response.response;
+    
+    // Extract the generated image
+    let imageUrl: string | null = null;
+    
+    for (const part of result.candidates?.[0]?.content?.parts || []) {
+      if ('inlineData' in part && part.inlineData) {
+        // Convert base64 to data URL
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        imageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
     }
 
-    console.log('Remix generated successfully');
+    if (!imageUrl) {
+      // Fallback: try to get text response for debugging
+      const textResponse = result.text();
+      console.log('No image generated. Text response:', textResponse);
+      throw new Error('No image was generated. The model may not support image generation with this prompt.');
+    }
+
+    console.log('Remix generated successfully with Gemini');
 
     return NextResponse.json({
       imageUrl,
@@ -225,19 +238,21 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Remix generation error:', error);
 
-    if (error instanceof OpenAI.APIError) {
-      if (error.status === 400 && error.message.includes('safety')) {
-        return NextResponse.json(
-          { error: 'The image could not be generated due to content policy. Please try a different description.' },
-          { status: 400 }
-        );
-      }
-      if (error.status === 429) {
-        return NextResponse.json(
-          { error: 'Too many requests. Please wait a moment and try again.' },
-          { status: 429 }
-        );
-      }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Handle specific errors
+    if (errorMessage.includes('quota') || errorMessage.includes('rate')) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a moment and try again.' },
+        { status: 429 }
+      );
+    }
+    
+    if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
+      return NextResponse.json(
+        { error: 'The image could not be generated due to content policy. Please try a different description.' },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json(
