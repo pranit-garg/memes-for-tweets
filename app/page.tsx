@@ -34,10 +34,15 @@ export default function Home() {
   const [usage, setUsage] = useState<UsageState>({ remaining: 10, isPremium: false });
 
   useEffect(() => {
+    // TEMPORARY: Bypass enabled for testing
+    setUsage({ remaining: -1, isPremium: true });
+    return;
+    
+    /* Original paywall logic - uncomment to re-enable:
     if (process.env.NEXT_PUBLIC_DISABLE_USAGE_LIMITS === 'true') {
       setUsage({ remaining: -1, isPremium: true });
       return;
-    }
+    }*/
 
     const getCookie = (name: string) => {
       const value = `; ${document.cookie}`;

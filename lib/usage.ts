@@ -5,7 +5,9 @@ const PREMIUM_COOKIE = 'meme-premium';
 const FREE_LIMIT = 10;
 
 function usageBypassEnabled(): boolean {
-  return process.env.DISABLE_USAGE_LIMITS === 'true';
+  // TEMPORARY: Bypass enabled for testing - set to false to re-enable paywall
+  return true;
+  // return process.env.DISABLE_USAGE_LIMITS === 'true';
 }
 
 export async function getUsageCount(): Promise<number> {
