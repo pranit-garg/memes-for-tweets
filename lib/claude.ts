@@ -34,6 +34,132 @@ export interface MatchResult {
   message?: string;
 }
 
+// MM-001: Tweet Analysis Types
+export type HumorType = 
+  | 'sarcasm' 
+  | 'irony' 
+  | 'hot-take' 
+  | 'complaint' 
+  | 'self-deprecation' 
+  | 'observation' 
+  | 'flex' 
+  | 'roast' 
+  | 'absurdist' 
+  | 'wholesome'
+  | 'comparison';
+
+export type Sentiment = 'positive' | 'negative' | 'neutral' | 'sarcastic' | 'mixed';
+
+export interface TweetAnalysis {
+  sentiment: Sentiment;
+  humorType: HumorType;
+  secondaryHumorType?: HumorType;
+  keyEntities: string[];
+  corePoint: string;
+  hasTwoAlternatives: boolean;
+  hasObviousOutcome: boolean;
+  isSelfSabotage: boolean;
+}
+
+// MM-001: Analyze tweet before matching
+async function analyzeTweet(tweet: string): Promise<TweetAnalysis> {
+  const prompt = `Analyze this tweet to help match it to the perfect meme template.
+
+TWEET: "${tweet}"
+
+Analyze and return JSON with these fields:
+{
+  "sentiment": "positive" | "negative" | "neutral" | "sarcastic" | "mixed",
+  "humorType": primary type from: "sarcasm", "irony", "hot-take", "complaint", "self-deprecation", "observation", "flex", "roast", "absurdist", "wholesome", "comparison",
+  "secondaryHumorType": optional secondary type (or null),
+  "keyEntities": array of main subjects/topics mentioned (max 3),
+  "corePoint": the main joke or point in ONE short sentence (max 15 words),
+  "hasTwoAlternatives": true if comparing two distinct options (for Drake/comparison memes),
+  "hasObviousOutcome": true if there's a predictable cause→effect (for Surprised Pikachu),
+  "isSelfSabotage": true if someone causes their own problem (for Bike Fall)
+}
+
+Be precise. The humor type should match what would make this tweet funny as a meme.
+Return ONLY the JSON object, no explanation.`;
+
+  try {
+    const response = await getAnthropic().messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      temperature: 0.3, // Lower temp for more consistent analysis
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type === 'text') {
+      const parsed = extractJson(content.text) as TweetAnalysis | null;
+      if (parsed && parsed.sentiment && parsed.humorType) {
+        console.log('Tweet analysis:', JSON.stringify(parsed, null, 2));
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error('Tweet analysis failed:', error);
+  }
+
+  // Fallback analysis using simple heuristics
+  return fallbackAnalyzeTweet(tweet);
+}
+
+// Fallback analysis when AI call fails
+function fallbackAnalyzeTweet(tweet: string): TweetAnalysis {
+  const lowerTweet = tweet.toLowerCase();
+  
+  // Detect sentiment
+  let sentiment: Sentiment = 'neutral';
+  if (lowerTweet.includes('worst') || lowerTweet.includes('hate') || lowerTweet.includes('bad') || lowerTweet.includes('sucks')) {
+    sentiment = 'negative';
+  } else if (lowerTweet.includes('love') || lowerTweet.includes('best') || lowerTweet.includes('amazing')) {
+    sentiment = 'positive';
+  } else if (lowerTweet.includes('apparently') || lowerTweet.includes('shocking') || lowerTweet.includes('surprising')) {
+    sentiment = 'sarcastic';
+  }
+
+  // Detect humor type
+  let humorType: HumorType = 'observation';
+  if (lowerTweet.includes(' vs ') || lowerTweet.includes(' or ') || lowerTweet.includes('instead')) {
+    humorType = 'comparison';
+  } else if (lowerTweet.includes('turns out') || lowerTweet.includes('apparently')) {
+    humorType = 'irony';
+  } else if (lowerTweet.includes('i think') || lowerTweet.includes('unpopular opinion') || lowerTweet.includes('hot take')) {
+    humorType = 'hot-take';
+  } else if (lowerTweet.includes('why do i') || lowerTweet.includes('me:') || lowerTweet.includes('myself')) {
+    humorType = 'self-deprecation';
+  } else if (sentiment === 'negative') {
+    humorType = 'complaint';
+  }
+
+  // Extract key entities (capitalized words)
+  const entities = tweet
+    .split(/\s+/)
+    .filter(w => /^[A-Z][a-zA-Z]+/.test(w) && w.length > 2)
+    .slice(0, 3);
+
+  // Check for patterns
+  const hasTwoAlternatives = /\bvs\b|\bor\b|instead of|rather than/i.test(tweet);
+  const hasObviousOutcome = /turns out|shocking|surprised|obviously/i.test(tweet);
+  const isSelfSabotage = /blame|fault|caused|my own/i.test(tweet);
+
+  // Create core point from first sentence
+  const firstSentence = tweet.split(/[.!?]/)[0]?.trim() || tweet;
+  const corePoint = firstSentence.length > 60 ? firstSentence.slice(0, 57) + '...' : firstSentence;
+
+  return {
+    sentiment,
+    humorType,
+    keyEntities: entities,
+    corePoint,
+    hasTwoAlternatives,
+    hasObviousOutcome,
+    isSelfSabotage,
+  };
+}
+
 // Build a curated template list with rich context
 function getCuratedTemplates(
   templates: MemeTemplate[],
@@ -103,10 +229,11 @@ function extractJson(text: string): unknown | null {
   }
 }
 
-// Single, robust matching function
+// Single, robust matching function - now uses pre-computed analysis
 async function generateMemeMatches(
   tweet: string,
   templates: MemeTemplate[],
+  analysis: TweetAnalysis,
   excludeIds: string[] = [],
   feedback?: string
 ): Promise<MemeMatch[] | null> {
@@ -120,61 +247,60 @@ async function generateMemeMatches(
     ? `\nDO NOT USE these template IDs (already shown): ${excludeIds.join(', ')}\n`
     : '';
 
-  const prompt = `You are an elite meme creator who understands EXACTLY how each meme format works.
+  // Build analysis context for the prompt
+  const analysisContext = `
+## PRE-ANALYZED TWEET INFO:
+- **Sentiment**: ${analysis.sentiment}
+- **Humor Type**: ${analysis.humorType}${analysis.secondaryHumorType ? ` (secondary: ${analysis.secondaryHumorType})` : ''}
+- **Key Subjects**: ${analysis.keyEntities.length > 0 ? analysis.keyEntities.join(', ') : 'general'}
+- **Core Point**: "${analysis.corePoint}"
+- **Has Two Alternatives**: ${analysis.hasTwoAlternatives ? 'YES - good for comparison memes' : 'NO - avoid Drake/comparison memes'}
+- **Has Obvious Outcome**: ${analysis.hasObviousOutcome ? 'YES - good for Surprised Pikachu' : 'NO'}
+- **Is Self-Sabotage**: ${analysis.isSelfSabotage ? 'YES - perfect for Bike Fall' : 'NO'}
+`;
 
-TWEET TO MEME:
-"${tweet}"
+  const prompt = `You are an elite meme creator. Use the pre-analyzed tweet info to pick PERFECT template matches.
+
+TWEET: "${tweet}"
+${analysisContext}
 ${feedbackLine}${excludeLine}
-## STEP 1: ANALYZE THE TWEET
-First, identify what type of content this is:
-- Is it a HOT TAKE or opinion? (good for: Change My Mind, Sign memes)
-- Is it IRONIC/SARCASTIC observation? (good for: This Is Fine, Bike Fall, Galaxy Brain)
-- Is it a COMPARISON between two things? (good for: Drake, Tuxedo Pooh - ONLY if comparing)
-- Is it a PREDICTABLE OUTCOME? (good for: Surprised Pikachu - "did X, got X result, shocked")
-- Is it SELF-DEPRECATION? (good for: Clown applying makeup, Bike Fall)
-- Is it a FRUSTRATION or complaint? (good for: Batman Slap, Angry Lady Cat)
 
-## STEP 2: FORMAT MATCHING RULES (CRITICAL!)
-ONLY use a format if the tweet ACTUALLY fits its structure:
+## TEMPLATE MATCHING RULES (USE THE ANALYSIS!):
 
-• Drake/Tuxedo Pooh: ONLY for "I prefer B over A" tweets. The tweet MUST have two alternatives.
-  ❌ BAD: "Grok is bad" → Drake doesn't work because there's no preference choice
-  ✓ GOOD: "Reading docs vs asking ChatGPT" → Drake works because it's comparing two options
+Based on humor type "${analysis.humorType}":
+${analysis.humorType === 'comparison' ? '→ USE: Drake, Tuxedo Pooh, Buff Doge vs Cheems' : ''}
+${analysis.humorType === 'irony' || analysis.humorType === 'sarcasm' ? '→ USE: This Is Fine, Bike Fall, Surprised Pikachu (if obvious outcome)' : ''}
+${analysis.humorType === 'hot-take' ? '→ USE: Change My Mind, Scroll of Truth' : ''}
+${analysis.humorType === 'complaint' ? '→ USE: Batman Slapping Robin, Y U No, First World Problems' : ''}
+${analysis.humorType === 'self-deprecation' ? '→ USE: Clown Applying Makeup, Bike Fall, Hide the Pain Harold' : ''}
+${analysis.humorType === 'roast' ? '→ USE: Batman Slapping Robin, Disaster Girl' : ''}
+${analysis.humorType === 'observation' ? '→ USE: Roll Safe, Futurama Fry, Third World Skeptical Kid' : ''}
 
-• Surprised Pikachu: ONLY for "obvious cause → obvious effect → surprise" 
-  ❌ BAD: Generic "X happens" → "reaction"  
-  ✓ GOOD: "Train AI on garbage → AI outputs garbage → *shocked*"
+${!analysis.hasTwoAlternatives ? '⚠️ NO comparison memes (Drake, Tuxedo Pooh) - tweet lacks two alternatives!' : ''}
+${!analysis.hasObviousOutcome ? '⚠️ Avoid Surprised Pikachu unless you can frame an obvious cause→effect' : ''}
+${analysis.isSelfSabotage ? '✓ Bike Fall is a GREAT fit for this self-sabotage situation!' : ''}
 
-• Bike Fall: Perfect for "X causes Y but they blame Z" or self-sabotage
-  ✓ GOOD: "Grok trains on Twitter brainrot → produces brainrot → X is confused"
-
-• This Is Fine: For ignoring obvious problems or chaos
-• Change My Mind: For controversial opinions stated as facts
-• Always Has Been: For "wait, X was always Y?" revelations
-• Expanding Brain: For increasingly absurd takes on one topic
-• Distracted Boyfriend: ONLY when there's literally "thing I should want" vs "temptation"
-
-## STEP 3: CAPTION RULES
+## CAPTION RULES:
 - MAX 6-8 words per text box
 - NO generic phrases like "Me:", "When you...", "POV:", "Nobody:"
-- Transform the tweet's IDEA, don't just copy its words
+- Transform the core point: "${analysis.corePoint}" into meme format
 - The caption should work even without seeing the original tweet
 
 ## AVAILABLE TEMPLATES:
 ${templateContext}
 
-## OUTPUT FORMAT (JSON array, no markdown):
+## OUTPUT FORMAT (JSON array only):
 [
   {
     "templateId": "exact ID from list",
     "templateName": "template name", 
-    "reasoning": "Specific reason why this format's structure matches the tweet's structure",
+    "reasoning": "Why this format matches the ${analysis.humorType} humor type",
     "suggestedTopText": "short punchy text",
     "suggestedBottomText": "short punchy text"
   }
 ]
 
-Return exactly 3 memes that ACTUALLY fit their format. Quality over forcing a format.`;
+Return exactly 3 memes that match the analyzed humor type. Quality over generic choices.`;
 
   try {
     console.log('=== generateMemeMatches START ===');
@@ -271,23 +397,45 @@ Return exactly 3 memes that ACTUALLY fit their format. Quality over forcing a fo
   }
 }
 
-// Intelligent fallback - still uses AI but with a simpler prompt
+// Intelligent fallback - still uses AI but with a simpler prompt + analysis
 async function generateFallbackMatches(
   tweet: string,
   templates: MemeTemplate[],
-  excludeIds: string[] = []
+  excludeIds: string[] = [],
+  analysis?: TweetAnalysis
 ): Promise<MemeMatch[]> {
-  // Try a simpler, more constrained prompt
-  const simpleTemplates = [
-    { id: '181913649', name: 'Drake Hotline Bling', hint: 'reject A, prefer B' },
-    { id: '161865971', name: 'Tuxedo Winnie the Pooh', hint: 'basic vs fancy' },
-    { id: '155067746', name: 'Surprised Pikachu', hint: 'obvious result is obvious' },
-    { id: '129242436', name: 'Change My Mind', hint: 'hot take statement' },
-    { id: '438680', name: 'Batman Slapping Robin', hint: 'shut down bad take' },
-    { id: '252600902', name: 'Always Has Been', hint: 'reveal something was always true' },
-  ].filter((t) => !excludeIds.includes(t.id));
+  // Filter templates based on analysis if available
+  const allTemplates = [
+    { id: '181913649', name: 'Drake Hotline Bling', hint: 'reject A, prefer B', types: ['comparison'] },
+    { id: '161865971', name: 'Tuxedo Winnie the Pooh', hint: 'basic vs fancy', types: ['comparison'] },
+    { id: '155067746', name: 'Surprised Pikachu', hint: 'obvious result is obvious', types: ['irony', 'sarcasm'] },
+    { id: '129242436', name: 'Change My Mind', hint: 'hot take statement', types: ['hot-take', 'observation'] },
+    { id: '438680', name: 'Batman Slapping Robin', hint: 'shut down bad take', types: ['roast', 'complaint'] },
+    { id: '252600902', name: 'Always Has Been', hint: 'reveal something was always true', types: ['irony', 'observation'] },
+    { id: '79132341', name: 'Bike Fall', hint: 'self-sabotage', types: ['self-deprecation', 'irony'] },
+    { id: '178591752', name: 'Clown Applying Makeup', hint: 'escalating bad decisions', types: ['self-deprecation'] },
+    { id: '61544', name: 'This Is Fine', hint: 'ignoring problems', types: ['irony', 'sarcasm'] },
+  ];
 
-  const simplePrompt = `Turn this tweet into 3 memes. Be creative and funny.
+  // Prioritize templates matching the humor type
+  let simpleTemplates = allTemplates.filter((t) => !excludeIds.includes(t.id));
+  if (analysis) {
+    const matchingTypes = simpleTemplates.filter(t => 
+      t.types.includes(analysis.humorType) || 
+      (analysis.secondaryHumorType && t.types.includes(analysis.secondaryHumorType))
+    );
+    const otherTypes = simpleTemplates.filter(t => 
+      !t.types.includes(analysis.humorType) && 
+      !(analysis.secondaryHumorType && t.types.includes(analysis.secondaryHumorType))
+    );
+    simpleTemplates = [...matchingTypes, ...otherTypes].slice(0, 6);
+  }
+
+  const analysisHint = analysis 
+    ? `\nThis tweet is ${analysis.humorType} humor. Core point: "${analysis.corePoint}"`
+    : '';
+
+  const simplePrompt = `Turn this tweet into 3 memes. Be creative and funny.${analysisHint}
 
 Tweet: "${tweet}"
 
@@ -538,8 +686,14 @@ export async function matchTweetToMemes(
   console.log('Tweet:', tweet);
   console.log('Excluded IDs:', excludeIds);
 
-  // First attempt: full matching
-  const matches = await generateMemeMatches(tweet, templates, excludeIds, feedback);
+  // MM-001: First, analyze the tweet
+  console.log('Step 1: Analyzing tweet...');
+  const analysis = await analyzeTweet(tweet);
+  console.log('Analysis complete:', analysis.humorType, analysis.sentiment);
+
+  // Second: match using the analysis
+  console.log('Step 2: Matching with analysis context...');
+  const matches = await generateMemeMatches(tweet, templates, analysis, excludeIds, feedback);
   
   if (matches && matches.length > 0) {
     console.log('Primary matching succeeded');
@@ -551,8 +705,8 @@ export async function matchTweetToMemes(
 
   console.log('Primary matching failed, trying fallback...');
   
-  // Second attempt: simpler fallback with AI
-  const fallbackMatches = await generateFallbackMatches(tweet, templates, excludeIds);
+  // Fallback: simpler matching (still uses analysis for better fallback captions)
+  const fallbackMatches = await generateFallbackMatches(tweet, templates, excludeIds, analysis);
   
   return {
     matches: fallbackMatches,

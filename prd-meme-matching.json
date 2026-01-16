@@ -1,0 +1,103 @@
+{
+  "feature": "Meme Matching Engine Improvements",
+  "branchName": "improve-meme-matching",
+  "description": "Substantially improve the quality, relevance, and humor of meme matches for tweets",
+  "userStories": [
+    {
+      "id": "MM-001",
+      "title": "Add tweet analysis step before matching",
+      "description": "Before matching, analyze the tweet to extract: sentiment, humor type (sarcasm, irony, hot take, complaint, observation), key entities, and the core joke/point. This structured analysis feeds into better template selection.",
+      "acceptanceCriteria": [
+        "Create analyzeTweet() function that returns structured analysis",
+        "Include sentiment (positive/negative/neutral/mixed)",
+        "Identify humor type from predefined categories",
+        "Extract key subjects/entities mentioned",
+        "Summarize the core point in one sentence"
+      ],
+      "priority": 1,
+      "passes": true,
+      "completedAt": "2026-01-16"
+    },
+    {
+      "id": "MM-002",
+      "title": "Implement template scoring system",
+      "description": "Instead of asking the LLM to pick templates, have it score ALL curated templates (0-100) based on fit, then select top 3. This ensures consistent evaluation across the full library.",
+      "acceptanceCriteria": [
+        "Create scoreTemplates() function",
+        "Score based on: format fit, humor alignment, specificity",
+        "Return top 3 highest-scoring templates with scores",
+        "Include reasoning for each score"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "MM-003",
+      "title": "Add caption generation as separate step",
+      "description": "Separate template selection from caption generation. First pick templates, then generate captions specifically optimized for each template's format and constraints.",
+      "acceptanceCriteria": [
+        "Create generateCaptions() function",
+        "Takes template + tweet analysis as input",
+        "Generates 2-3 caption variations per template",
+        "Respects template's text box constraints",
+        "Captions are punchy (under 8 words per box)"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "MM-004",
+      "title": "Add self-critique step",
+      "description": "After generating matches, have the LLM critique its own suggestions and optionally regenerate if quality is below threshold. This catches weak matches before showing to user.",
+      "acceptanceCriteria": [
+        "Create critiqueMatches() function",
+        "Score each match on: humor, relevance, virality potential",
+        "Flag matches scoring below 70/100",
+        "Optionally regenerate flagged matches",
+        "Limit to 1 regeneration attempt to avoid loops"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "MM-005",
+      "title": "Expand template database with humor categories",
+      "description": "Tag each template in MEME_FORMAT_DATABASE with specific humor categories it excels at (sarcasm, irony, self-deprecation, hot-takes, etc). Use these tags to filter templates before scoring.",
+      "acceptanceCriteria": [
+        "Add 'humorTypes' array to each template in database",
+        "Categories: sarcasm, irony, self-deprecation, hot-take, absurdist, wholesome, complaint, flex, roast",
+        "Update getMemeFormatInfo to return humor types",
+        "Filter templates by matching humor type before scoring"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "MM-006",
+      "title": "Add example captions to template database",
+      "description": "For each curated template, add 2-3 example captions that demonstrate ideal usage. The LLM can use these as few-shot examples for better caption generation.",
+      "acceptanceCriteria": [
+        "Add 'examples' array to each template in MEME_FORMAT_DATABASE",
+        "Each example has topText and bottomText",
+        "Examples demonstrate the template's ideal joke structure",
+        "Include examples in prompt context for caption generation"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "MM-007",
+      "title": "Implement A/B testing infrastructure",
+      "description": "Add ability to test different matching strategies. Log which templates users select and download to measure success.",
+      "acceptanceCriteria": [
+        "Add analytics events for: template shown, template selected, meme downloaded",
+        "Store strategy version with each event",
+        "Create simple dashboard or logging to review performance",
+        "Allow switching between matching strategies via env var"
+      ],
+      "priority": 7,
+      "passes": false
+    }
+  ],
+  "progress": []
+}
