@@ -7,6 +7,7 @@ interface EnrichedMatch extends MemeMatch {
   templateUrl: string;
   width: number;
   height: number;
+  boxCount: number;
 }
 
 interface MemeEditorProps {
@@ -19,6 +20,34 @@ interface TextSettings {
   fontSize: number;
   yOffset: number;
 }
+
+// Panel layout configurations for different meme formats
+const PANEL_LAYOUTS: Record<string, { panels: Array<{ x: number; y: number; width: number; height: number; align: 'left' | 'center' | 'right' }> }> = {
+  // Expanding Brain - 4 vertical panels, text on left side
+  'multi-panel-4-vertical': {
+    panels: [
+      { x: 0.25, y: 0.125, width: 0.45, height: 0.25, align: 'center' },
+      { x: 0.25, y: 0.375, width: 0.45, height: 0.25, align: 'center' },
+      { x: 0.25, y: 0.625, width: 0.45, height: 0.25, align: 'center' },
+      { x: 0.25, y: 0.875, width: 0.45, height: 0.25, align: 'center' },
+    ],
+  },
+  // 3-panel vertical (like Gru's Plan)
+  'multi-panel-3-vertical': {
+    panels: [
+      { x: 0.5, y: 0.167, width: 0.9, height: 0.33, align: 'center' },
+      { x: 0.5, y: 0.5, width: 0.9, height: 0.33, align: 'center' },
+      { x: 0.5, y: 0.833, width: 0.9, height: 0.33, align: 'center' },
+    ],
+  },
+  // Standard top-bottom
+  'top-bottom': {
+    panels: [
+      { x: 0.5, y: 0.08, width: 0.95, height: 0.4, align: 'center' },
+      { x: 0.5, y: 0.92, width: 0.95, height: 0.4, align: 'center' },
+    ],
+  },
+};
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(' ');
@@ -45,27 +74,35 @@ function drawMemeText(
   y: number,
   fontSize: number,
   maxWidth: number,
-  isBottom: boolean
+  verticalAlign: 'top' | 'center' | 'bottom' = 'center'
 ) {
   ctx.font = `bold ${fontSize}px Impact, 'Arial Black', sans-serif`;
   ctx.textAlign = 'center';
-  ctx.textBaseline = isBottom ? 'bottom' : 'top';
-  
+
   const lines = wrapText(ctx, text.toUpperCase(), maxWidth);
   const lineHeight = fontSize * 1.1;
-  
-  let startY = y;
-  if (isBottom) {
-    startY = y - (lines.length - 1) * lineHeight;
+  const totalHeight = lines.length * lineHeight;
+
+  let startY: number;
+  switch (verticalAlign) {
+    case 'top':
+      startY = y;
+      break;
+    case 'bottom':
+      startY = y - totalHeight + lineHeight;
+      break;
+    case 'center':
+    default:
+      startY = y - totalHeight / 2 + lineHeight / 2;
   }
 
   lines.forEach((line, index) => {
     const lineY = startY + index * lineHeight;
-    
+
     ctx.strokeStyle = 'black';
     ctx.lineWidth = fontSize * 0.15;
     ctx.lineJoin = 'round';
-    
+
     for (let i = 0; i < 4; i++) {
       ctx.strokeText(line, x, lineY);
     }
@@ -74,36 +111,46 @@ function drawMemeText(
   });
 }
 
+function getLayoutForFormat(format: string, boxCount: number): typeof PANEL_LAYOUTS['top-bottom'] {
+  // Multi-panel memes
+  if (format === 'multi-panel') {
+    if (boxCount === 4) return PANEL_LAYOUTS['multi-panel-4-vertical'];
+    if (boxCount === 3) return PANEL_LAYOUTS['multi-panel-3-vertical'];
+  }
+  // Default to top-bottom
+  return PANEL_LAYOUTS['top-bottom'];
+}
+
+function getPositionLabel(position: string, index: number, total: number): string {
+  if (position.startsWith('panel')) {
+    const num = position.replace('panel', '');
+    return `Panel ${num} text`;
+  }
+  if (position === 'top') return 'Top text';
+  if (position === 'bottom') return 'Bottom text';
+  if (position === 'left') return 'Left text';
+  if (position === 'right') return 'Right text';
+  return `Text ${index + 1}`;
+}
+
 export default function MemeEditor({ match, onDownload, onBack }: MemeEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  const initialTopText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
-  const initialBottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
-  
-  const [topText, setTopText] = useState(initialTopText);
-  const [bottomText, setBottomText] = useState(initialBottomText);
+
+  // Initialize text values from textBoxes
+  const initialTexts = match.textBoxes?.map(tb => tb.text) ||
+    [match.suggestedTopText || '', match.suggestedBottomText || ''];
+
+  const [texts, setTexts] = useState<string[]>(initialTexts);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  
-  const [topSettings, setTopSettings] = useState<TextSettings>({ fontSize: 40, yOffset: 0 });
-  const [bottomSettings, setBottomSettings] = useState<TextSettings>({ fontSize: 40, yOffset: 0 });
-  
-  const [, setTextBoxes] = useState<TextBox[]>(
-    match.textBoxes || [
-      { position: 'top', text: initialTopText },
-      { position: 'bottom', text: initialBottomText },
-    ]
+
+  // Settings for each text box
+  const [textSettings, setTextSettings] = useState<TextSettings[]>(
+    initialTexts.map(() => ({ fontSize: 40, yOffset: 0 }))
   );
 
-  useEffect(() => {
-    setTextBoxes(prev => {
-      const newBoxes = [...prev];
-      if (newBoxes[0]) newBoxes[0] = { ...newBoxes[0], text: topText };
-      if (newBoxes[1]) newBoxes[1] = { ...newBoxes[1], text: bottomText };
-      return newBoxes;
-    });
-  }, [topText, bottomText]);
+  const isMultiPanel = match.format === 'multi-panel' || match.boxCount > 2;
 
   const renderMeme = useCallback(() => {
     const canvas = canvasRef.current;
@@ -123,29 +170,56 @@ export default function MemeEditor({ match, onDownload, onBack }: MemeEditorProp
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      const baseFontSize = Math.min(canvas.width / 14, canvas.height / 16);
-      const padding = canvas.width * 0.02;
-      const maxTextWidth = canvas.width - padding * 2;
+      const layout = getLayoutForFormat(match.format, match.boxCount);
+      const baseFontSize = Math.min(canvas.width / 14, canvas.height / (16 * Math.max(1, texts.length / 2)));
 
-      if (topText.trim()) {
-        const fontSize = baseFontSize * (topSettings.fontSize / 50);
-        const yPos = padding + (topSettings.yOffset / 100) * (canvas.height * 0.2);
-        drawMemeText(ctx, topText, canvas.width / 2, yPos, fontSize, maxTextWidth, false);
-      }
+      texts.forEach((text, index) => {
+        if (!text.trim()) return;
 
-      if (bottomText.trim()) {
-        const fontSize = baseFontSize * (bottomSettings.fontSize / 50);
-        const yPos = canvas.height - padding - (bottomSettings.yOffset / 100) * (canvas.height * 0.2);
-        drawMemeText(ctx, bottomText, canvas.width / 2, yPos, fontSize, maxTextWidth, true);
-      }
+        const settings = textSettings[index] || { fontSize: 40, yOffset: 0 };
+        const fontSize = baseFontSize * (settings.fontSize / 50);
+
+        // Get panel position from layout
+        const panel = layout.panels[index];
+        if (panel) {
+          const x = panel.x * canvas.width;
+          const y = (panel.y + settings.yOffset / 200) * canvas.height;
+          const maxTextWidth = panel.width * canvas.width;
+
+          drawMemeText(ctx, text, x, y, fontSize, maxTextWidth, 'center');
+        } else {
+          // Fallback: distribute vertically
+          const yPercent = (index + 1) / (texts.length + 1);
+          const y = yPercent * canvas.height;
+          const maxTextWidth = canvas.width * 0.9;
+
+          drawMemeText(ctx, text, canvas.width / 2, y, fontSize, maxTextWidth, 'center');
+        }
+      });
     };
 
     img.src = match.templateUrl;
-  }, [match.templateUrl, topText, bottomText, topSettings, bottomSettings]);
+  }, [match.templateUrl, match.format, match.boxCount, texts, textSettings]);
 
   useEffect(() => {
     renderMeme();
   }, [renderMeme]);
+
+  const handleTextChange = (index: number, value: string) => {
+    setTexts(prev => {
+      const newTexts = [...prev];
+      newTexts[index] = value;
+      return newTexts;
+    });
+  };
+
+  const handleSettingChange = (index: number, key: keyof TextSettings, value: number) => {
+    setTextSettings(prev => {
+      const newSettings = [...prev];
+      newSettings[index] = { ...newSettings[index], [key]: value };
+      return newSettings;
+    });
+  };
 
   const handleDownload = async () => {
     const canvas = canvasRef.current;
@@ -209,34 +283,32 @@ export default function MemeEditor({ match, onDownload, onBack }: MemeEditorProp
           </div>
         </div>
 
-        {/* Text inputs */}
+        {/* Text inputs - dynamic based on textBoxes */}
         <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm text-[var(--text-secondary)] mb-2">Top text</label>
-            <input
-              type="text"
-              value={topText}
-              onChange={(e) => setTopText(e.target.value)}
-              placeholder="Enter top text..."
-              className="w-full p-3 input"
-            />
-          </div>
+          {texts.map((text, index) => {
+            const position = match.textBoxes?.[index]?.position || (index === 0 ? 'top' : 'bottom');
+            const label = getPositionLabel(position, index, texts.length);
 
-          <div>
-            <label className="block text-sm text-[var(--text-secondary)] mb-2">Bottom text</label>
-            <input
-              type="text"
-              value={bottomText}
-              onChange={(e) => setBottomText(e.target.value)}
-              placeholder="Enter bottom text..."
-              className="w-full p-3 input"
-            />
-          </div>
+            return (
+              <div key={index}>
+                <label className="block text-sm text-[var(--text-secondary)] mb-2">
+                  {label}
+                </label>
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e) => handleTextChange(index, e.target.value)}
+                  placeholder={`Enter ${label.toLowerCase()}...`}
+                  className="w-full p-3 input"
+                />
+              </div>
+            );
+          })}
 
           {/* Advanced toggle */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] 
+            className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]
                        flex items-center justify-center gap-2 transition-colors"
           >
             <svg
@@ -250,70 +322,55 @@ export default function MemeEditor({ match, onDownload, onBack }: MemeEditorProp
             {showAdvanced ? 'Hide' : 'Adjust'} text size & position
           </button>
 
-          {/* Advanced controls */}
+          {/* Advanced controls - per text box */}
           {showAdvanced && (
             <div className="p-4 bg-[var(--bg-secondary)] rounded-lg space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                    <span>Top size</span>
-                    <span>{topSettings.fontSize}%</span>
+              {texts.map((_, index) => {
+                const position = match.textBoxes?.[index]?.position || (index === 0 ? 'top' : 'bottom');
+                const label = getPositionLabel(position, index, texts.length);
+                const settings = textSettings[index] || { fontSize: 40, yOffset: 0 };
+
+                return (
+                  <div key={index} className="space-y-2">
+                    {texts.length > 2 && (
+                      <div className="text-xs text-[var(--text-muted)] font-medium">{label}</div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                          <span>{texts.length <= 2 ? `${label.split(' ')[0]} size` : 'Size'}</span>
+                          <span>{settings.fontSize}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="20"
+                          max="100"
+                          value={settings.fontSize}
+                          onChange={(e) => handleSettingChange(index, 'fontSize', Number(e.target.value))}
+                          className="w-full accent-[var(--accent)]"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                          <span>{texts.length <= 2 ? `${label.split(' ')[0]} position` : 'Position'}</span>
+                          <span>{settings.yOffset}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-50"
+                          max="50"
+                          value={settings.yOffset}
+                          onChange={(e) => handleSettingChange(index, 'yOffset', Number(e.target.value))}
+                          className="w-full accent-[var(--accent)]"
+                        />
+                      </div>
+                    </div>
+                    {index < texts.length - 1 && texts.length > 2 && (
+                      <div className="border-b border-[var(--border)] pt-2" />
+                    )}
                   </div>
-                  <input
-                    type="range"
-                    min="20"
-                    max="100"
-                    value={topSettings.fontSize}
-                    onChange={(e) => setTopSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                    className="w-full accent-[var(--accent)]"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                    <span>Top position</span>
-                    <span>{topSettings.yOffset}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="50"
-                    value={topSettings.yOffset}
-                    onChange={(e) => setTopSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
-                    className="w-full accent-[var(--accent)]"
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                    <span>Bottom size</span>
-                    <span>{bottomSettings.fontSize}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="20"
-                    max="100"
-                    value={bottomSettings.fontSize}
-                    onChange={(e) => setBottomSettings(prev => ({ ...prev, fontSize: Number(e.target.value) }))}
-                    className="w-full accent-[var(--accent)]"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                    <span>Bottom position</span>
-                    <span>{bottomSettings.yOffset}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="50"
-                    value={bottomSettings.yOffset}
-                    onChange={(e) => setBottomSettings(prev => ({ ...prev, yOffset: Number(e.target.value) }))}
-                    className="w-full accent-[var(--accent)]"
-                  />
-                </div>
-              </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -14,6 +14,7 @@ interface EnrichedMatch extends MemeMatch {
   templateUrl: string;
   width: number;
   height: number;
+  boxCount: number;
 }
 
 interface UsageState {

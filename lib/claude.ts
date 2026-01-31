@@ -75,6 +75,8 @@ export interface TweetAnalysis {
   isSelfSabotage: boolean;
   topics?: TweetTopic[];  // NEW: Detected topics
   hasMultipleSteps?: boolean;  // NEW: For multi-panel memes
+  emotionalVibe?: string; // NEW: The specific feeling (e.g., "exhausted realization", "smug superiority")
+  memeStructure?: string; // NEW: Suggested structure (e.g., "X vs Y", "Expectation vs Reality")
 }
 
 // MM-001: Analyze tweet before matching
@@ -94,7 +96,9 @@ Analyze and return JSON with these fields:
   "hasObviousOutcome": true if there's a predictable cause→effect (for Surprised Pikachu),
   "isSelfSabotage": true if someone causes their own problem (for Bike Fall),
   "topics": array from ["tech", "work", "relationships", "food", "money", "health", "gaming", "social-media", "education", "politics", "universal"],
-  "hasMultipleSteps": true if the tweet describes a sequence/progression (for multi-panel memes like Gru's Plan, Clown Makeup)
+  "hasMultipleSteps": true if the tweet describes a sequence/progression (for multi-panel memes like Gru's Plan, Clown Makeup),
+  "emotionalVibe": "short phrase describing the specific feeling (e.g. 'exhausted realization', 'smug superiority', 'confused screaming')",
+  "memeStructure": "suggestion for meme structure (e.g. 'X vs Y', 'Expectation vs Reality', 'Me pretending to be fine')"
 }
 
 Be precise. The humor type should match what would make this tweet funny as a meme.
@@ -190,6 +194,8 @@ function fallbackAnalyzeTweet(tweet: string): TweetAnalysis {
     isSelfSabotage,
     topics,
     hasMultipleSteps,
+    emotionalVibe: 'neutral observation',
+    memeStructure: 'general reaction',
   };
 }
 
@@ -294,6 +300,8 @@ ANALYSIS:
 - Sentiment: ${analysis.sentiment}
 - Core point: ${analysis.corePoint}
 - Topics: ${topicsStr}
+- Vibe: ${analysis.emotionalVibe || 'N/A'}
+- Suggested Structure: ${analysis.memeStructure || 'N/A'}
 - Has comparison: ${analysis.hasTwoAlternatives}
 - Has obvious outcome: ${analysis.hasObviousOutcome}
 - Self-sabotage: ${analysis.isSelfSabotage}${multiStepHint}
@@ -301,7 +309,7 @@ ANALYSIS:
 RULES:
 - ONLY comparison memes (Drake, Tuxedo Pooh) if tweet has TWO alternatives
 - Surprised Pikachu ONLY for obvious cause→effect
-- Match the humor type to the template
+- Match the "Vibe" and "Structure" to the template's strengths
 - DIVERSITY: Pick templates with DIFFERENT formats (don't pick 3 comparison memes!)
 - Prefer templates matching the tweet's topics
 
@@ -384,80 +392,114 @@ function enforceDiversity(
   return diverseIds;
 }
 
-// Caption tone styles for variety
-type CaptionTone = 'deadpan' | 'exaggerated' | 'absurdist' | 'wholesome' | 'savage';
+// Gold standard examples for few-shot learning
+const GOLD_STANDARD_EXAMPLES = `
+### EXAMPLE 1:
+TWEET: "I just spent 3 hours debugging a 5-line script that only had a typo."
+MEME: Clown Applying Makeup
+PANELS:
+1. "I'll just write this quick script."
+2. "Wait, why isn't it working?"
+3. "Refactoring the entire logic for 2 hours."
+4. "It was a missing semicolon."
+REASONING: Classic escalating self-own.
 
-const TONE_INSTRUCTIONS: Record<CaptionTone, string> = {
-  deadpan: 'Use a dry, matter-of-fact tone. No exclamation marks. State things plainly for comedic effect.',
-  exaggerated: 'Amp up the drama! Use hyperbole and dramatic statements. Make it over-the-top.',
-  absurdist: 'Go weird and unexpected. Non-sequiturs welcome. Subvert expectations.',
-  wholesome: 'Keep it light and relatable. Gentle humor that everyone can enjoy.',
-  savage: 'Go hard. Be brutally honest. No holding back on the roast.',
-};
+### EXAMPLE 2:
+TWEET: "My cat watching me work from home like I'm an intruder in his kingdom."
+MEME: Is This a Pigeon
+TEXT:
+- Me: "My Cat"
+- Object: "Me sitting at my desk"
+- Caption: "Is this a trespasser?"
+REASONING: Confident misidentification.
+
+### EXAMPLE 3:
+TWEET: "The job says 'competitive salary' but they don't list it in the posting."
+MEME: Anakin Padme 4 Panel
+PANELS:
+1. "It's a competitive salary."
+2. "So it's above market rate, right?"
+3. "..."
+4. "Right??"
+REASONING: Exposing the hidden red flag.
+`;
 
 // MM-003: Step 2 - Generate captions for selected templates
-// IMPROVED: Now supports multi-panel memes with 3-4 text boxes and varied tones
+// IMPROVED: "Comedy Writer" Engine - Uses deep context and specific meme rules
 async function generateCaptions(
   tweet: string,
   selectedTemplates: MemeTemplate[],
   analysis: TweetAnalysis
 ): Promise<MemeMatch[]> {
-  // Assign different tones to each template for variety
-  const tones: CaptionTone[] = ['deadpan', 'exaggerated', 'absurdist', 'wholesome', 'savage'];
-  const shuffledTones = tones.sort(() => Math.random() - 0.5);
   
   const templateDetails = selectedTemplates.map((t, idx) => {
     const info = getMemeFormatInfo(t);
     const examples = info.exampleCaptions?.join(' | ') || 'None';
     const boxesDesc = info.textBoxes.map(b => `${b.position}: ${b.purpose}`).join(', ');
     const isMultiPanel = info.format === 'multi-panel' || info.textBoxes.length > 2;
-    const assignedTone = shuffledTones[idx % shuffledTones.length];
     
-    return `Template ${idx + 1}: ${t.name} (ID: ${t.id})
-Format: ${info.format}${isMultiPanel ? ' (MULTI-PANEL - use all boxes!)' : ''}
-How it works: ${info.description}
-Text boxes: ${boxesDesc}
-Example captions: ${examples}
-TONE FOR THIS ONE: ${assignedTone.toUpperCase()} - ${TONE_INSTRUCTIONS[assignedTone]}`;
+    // Create specific instructions based on the meme format
+    let specificInstructions = "";
+    if (info.format === 'comparison') {
+      specificInstructions = "For COMPARISON memes: Make the contrast extreme and obvious. Left/Top is usually the 'boring/normal' thing, Right/Bottom is the 'wild/better/worse' thing.";
+    } else if (info.format === 'reaction') {
+      specificInstructions = "For REACTION memes: The top text should be the SITUATION (setup), the image itself is the reaction. Don't describe the reaction in text. Make the setup relatable.";
+    } else if (info.format === 'label') {
+      specificInstructions = "For LABEL memes: You are labeling objects in the scene. Keep text very short (1-4 words).";
+    }
+
+    return `### TEMPLATE ${idx + 1}: ${t.name} (ID: ${t.id})
+- **Format**: ${info.format}${isMultiPanel ? ' (MULTI-PANEL - use all boxes!)' : ''}
+- **The Vibe**: ${info.bestFor}
+- **Text Structure**: ${boxesDesc}
+- **Examples**: ${examples}
+- **Specific Guide**: ${specificInstructions}`;
   }).join('\n\n');
 
-  const prompt = `Generate perfect captions for these meme templates.
+  const prompt = `You are a legendary comedy writer for a meme page. Your goal is to turn this tweet into a viral meme.
 
-TWEET: "${tweet}"
-Core point: "${analysis.corePoint}"
-Humor type: ${analysis.humorType}
+### GOLD STANDARD EXAMPLES FOR INSPIRATION:
+${GOLD_STANDARD_EXAMPLES}
+
+### TARGET TWEET:
+"${tweet}"
+
+ANALYSIS:
+- **Core Point**: "${analysis.corePoint}"
+- **Vibe**: ${analysis.emotionalVibe || analysis.humorType}
+- **Suggested Structure**: ${analysis.memeStructure || 'N/A'}
+- **Entities**: ${analysis.keyEntities.join(', ')}
+
+INSTRUCTIONS:
+1. **DON'T JUST REPEAT THE TWEET.** This is the #1 rule. Adapt the *concept* to the meme format.
+2. **Show, Don't Tell.** If the meme image shows the emotion, don't write it in text.
+3. **Be Specific.** Use the specific entities from the tweet (e.g. if they mention "JavaScript", use "JavaScript", not "coding language").
+4. **Short & Punchy.** aim for <10 words per box.
+5. **Format-Aware.** Follow the "Specific Guide" for each template below exactly.
+6. **No "Me:" prefixes** unless absolutely necessary for the format.
 
 ${templateDetails}
 
-CAPTION RULES:
-1. MAX 6-8 words per text box
-2. NO "Me:", "When you...", "POV:", "Nobody:"
-3. Transform the tweet's IDEA - don't copy words
-4. Make it FUNNY and PUNCHY
-5. Each meme should feel fresh and creative
-6. For MULTI-PANEL memes: Fill ALL panels! Use panel1, panel2, panel3, panel4 as needed.
-7. IMPORTANT: Follow the assigned TONE for each template to make them feel different!
-
-Return JSON array:
+Reply with a JSON array of caption objects:
 [
   {
     "templateId": "exact ID",
     "templateName": "name",
-    "reasoning": "Why this works for the humor type",
-    "suggestedTopText": "for top/bottom memes",
-    "suggestedBottomText": "for top/bottom memes",
-    "panel1": "for multi-panel (if applicable)",
-    "panel2": "for multi-panel (if applicable)",
-    "panel3": "for multi-panel (if applicable)",
-    "panel4": "for multi-panel (if applicable)"
+    "reasoning": "Brief explanation of why this angle is funny",
+    "suggestedTopText": "...",
+    "suggestedBottomText": "...",
+    "panel1": "...",
+    "panel2": "...",
+    "panel3": "...",
+    "panel4": "..."
   }
 ]`;
 
   try {
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1200,
-      temperature: 0.8,
+      max_tokens: 1500, // Increased for creative freedom
+      temperature: 0.9, // Higher temp for better humor
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -470,36 +512,42 @@ Return JSON array:
           const formatInfo = template ? getMemeFormatInfo(template) : null;
           const isMultiPanel = formatInfo?.format === 'multi-panel' || (formatInfo?.textBoxes.length || 0) > 2;
           
-          // Build textBoxes based on template format
-          let textBoxes: TextBox[];
-          if (isMultiPanel && (m.panel1 || m.panel2)) {
-            // Multi-panel meme
-            textBoxes = [];
-            if (m.panel1) textBoxes.push({ position: 'panel1', text: String(m.panel1).slice(0, 100) });
-            if (m.panel2) textBoxes.push({ position: 'panel2', text: String(m.panel2).slice(0, 100) });
-            if (m.panel3) textBoxes.push({ position: 'panel3', text: String(m.panel3).slice(0, 100) });
-            if (m.panel4) textBoxes.push({ position: 'panel4', text: String(m.panel4).slice(0, 100) });
-            // Fallback: if no panels but has top/bottom, use those
-            if (textBoxes.length === 0) {
-              textBoxes = [
-                { position: 'top', text: String(m.suggestedTopText || '').slice(0, 100) },
-                { position: 'bottom', text: String(m.suggestedBottomText || '').slice(0, 100) },
-              ];
-            }
+          // Build textBoxes based on template format and returned keys
+          let textBoxes: TextBox[] = [];
+          
+          // Helper to clean text
+          const clean = (s: any) => String(s || '').trim().slice(0, 150);
+
+          if (isMultiPanel) {
+             // Explicit panels
+             if (m.panel1) textBoxes.push({ position: 'panel1', text: clean(m.panel1) });
+             if (m.panel2) textBoxes.push({ position: 'panel2', text: clean(m.panel2) });
+             if (m.panel3) textBoxes.push({ position: 'panel3', text: clean(m.panel3) });
+             if (m.panel4) textBoxes.push({ position: 'panel4', text: clean(m.panel4) });
+             
+             // Fallback if AI used top/bottom for a multi-panel meme
+             if (textBoxes.length === 0) {
+               if (m.suggestedTopText) textBoxes.push({ position: 'top', text: clean(m.suggestedTopText) });
+               if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
+             }
           } else {
-            // Standard top/bottom meme
-            textBoxes = [
-              { position: 'top', text: String(m.suggestedTopText || '').slice(0, 100) },
-              { position: 'bottom', text: String(m.suggestedBottomText || '').slice(0, 100) },
-            ];
+            // Standard top/bottom
+            if (m.suggestedTopText) textBoxes.push({ position: 'top', text: clean(m.suggestedTopText) });
+            if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
+            
+            // Handle label memes that might only have one text
+            if (textBoxes.length === 0 && formatInfo?.format === 'label') {
+               if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
+               else if (m.suggestedTopText) textBoxes.push({ position: 'center', text: clean(m.suggestedTopText) });
+            }
           }
           
           return {
             templateId: m.templateId,
             templateName: m.templateName || template?.name || 'Meme',
-            reasoning: m.reasoning || 'Great match',
-            suggestedTopText: String(m.suggestedTopText || m.panel1 || '').slice(0, 100),
-            suggestedBottomText: String(m.suggestedBottomText || m.panel2 || '').slice(0, 100),
+            reasoning: m.reasoning || 'Comedy gold',
+            suggestedTopText: clean(m.suggestedTopText || m.panel1),
+            suggestedBottomText: clean(m.suggestedBottomText || m.panel2),
             format: formatInfo?.format || 'top-bottom',
             textBoxes,
           };

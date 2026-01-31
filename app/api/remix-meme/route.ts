@@ -197,12 +197,12 @@ export async function POST(request: NextRequest) {
     const prompt = buildRemixPrompt(body);
     console.log('Generating remix with Gemini, prompt:', prompt.slice(0, 300) + '...');
 
-    // Use Gemini's image generation model (Nano Banana / Imagen 3)
+    // Use Gemini's latest image generation model
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp-image-generation',
+      model: 'gemini-2.0-flash',
       generationConfig: {
-        responseModalities: ['Text', 'Image'],
-      } as never,
+        responseModalities: ['image'],
+      } as any,
     });
 
     const response = await model.generateContent(prompt);
