@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { MemeTemplate, getMemeFormatInfo, MEME_FORMAT_DATABASE, scoreTemplates, getTopScoredTemplates, type ScoringInput } from './imgflip';
+import { MemeTemplate, getMemeFormatInfo, scoreTemplates, getTopScoredTemplates, type ScoringInput } from './imgflip';
 
 let anthropicInstance: Anthropic | null = null;
 
@@ -199,37 +199,6 @@ function fallbackAnalyzeTweet(tweet: string): TweetAnalysis {
   };
 }
 
-// Build a curated template list with rich context
-function getCuratedTemplates(
-  templates: MemeTemplate[],
-  excludeIds: string[] = []
-): string {
-  const excludeSet = new Set(excludeIds);
-  const curatedIds = Object.keys(MEME_FORMAT_DATABASE);
-  
-  // Get curated templates first (we have rich descriptions for these)
-  const curated = templates.filter(
-    (t) => curatedIds.includes(t.id) && !excludeSet.has(t.id)
-  );
-  
-  // Add some popular templates not in our curated list
-  const popular = templates
-    .filter((t) => !curatedIds.includes(t.id) && !excludeSet.has(t.id))
-    .slice(0, 25);
-  
-  const all = [...curated, ...popular];
-  
-  return all
-    .map((t) => {
-      const info = getMemeFormatInfo(t);
-      return `• ${t.name} (ID: ${t.id})
-  Format: ${info.format} | Boxes: ${t.box_count}
-  Best for: ${info.bestFor}
-  How it works: ${info.description}`;
-    })
-    .join('\n\n');
-}
-
 // Extract JSON from potentially messy LLM output
 function extractJson(text: string): unknown | null {
   // Remove markdown code blocks
@@ -268,35 +237,47 @@ function extractJson(text: string): unknown | null {
   }
 }
 
-// MM-003: Step 1 - Select best template IDs
-// IMPROVED: Now enforces diversity (different formats) and considers topics
-async function selectBestTemplates(
+// MM-003: Combined select + caption in a single API call
+// The AI picks the best 3 templates AND generates captions together,
+// so it can reason about WHY a template fits while writing the caption.
+async function selectAndCaption(
   tweet: string,
   templates: MemeTemplate[],
   analysis: TweetAnalysis,
   excludeIds: string[] = [],
   count: number = 3
-): Promise<string[]> {
+): Promise<MemeMatch[]> {
   const templateList = templates
     .filter(t => !excludeIds.includes(t.id))
     .map(t => {
       const info = getMemeFormatInfo(t);
       const topicStr = info.topicTags?.join(', ') || 'universal';
-      return `${t.id}: ${t.name} (${info.format}) - ${info.bestFor} [topics: ${topicStr}]`;
+      const humorStr = info.humorTags?.join(', ') || 'general';
+      const boxesDesc = info.textBoxes.map(b => `${b.position}: ${b.purpose}`).join('; ');
+      const exampleLine = info.exampleCaptions?.[0] ? `\n  Example: ${info.exampleCaptions[0]}` : '';
+      const isMultiPanel = info.format === 'multi-panel' || info.textBoxes.length > 2;
+      return `${t.id}: ${t.name} (${info.format}${isMultiPanel ? ' - MULTI-PANEL, use all boxes!' : ''}, ${t.box_count} boxes)
+  Best for: ${info.bestFor}
+  Humor: [${humorStr}] | Topics: [${topicStr}]
+  Boxes: [${boxesDesc}]${exampleLine}`;
     })
     .join('\n');
 
   const topicsStr = analysis.topics?.join(', ') || 'general';
-  const multiStepHint = analysis.hasMultipleSteps 
+  const multiStepHint = analysis.hasMultipleSteps
     ? '\n- Has multiple steps/progression: YES - consider multi-panel memes like Grus Plan, Clown Makeup, Expanding Brain'
     : '';
 
-  const prompt = `Select the ${count} BEST meme templates for this tweet.
+  const prompt = `You are a legendary comedy writer. Pick the ${count} BEST meme templates for this tweet AND write captions for each.
 
-TWEET: "${tweet}"
+### GOLD STANDARD EXAMPLES (study the "WHY IT WORKS"):
+${GOLD_STANDARD_EXAMPLES}
 
-ANALYSIS:
-- Humor: ${analysis.humorType}
+### TARGET TWEET:
+"${tweet}"
+
+### ANALYSIS:
+- Humor: ${analysis.humorType}${analysis.secondaryHumorType ? ` (secondary: ${analysis.secondaryHumorType})` : ''}
 - Sentiment: ${analysis.sentiment}
 - Core point: ${analysis.corePoint}
 - Topics: ${topicsStr}
@@ -306,48 +287,113 @@ ANALYSIS:
 - Has obvious outcome: ${analysis.hasObviousOutcome}
 - Self-sabotage: ${analysis.isSelfSabotage}${multiStepHint}
 
-RULES:
+### SELECTION RULES:
 - ONLY comparison memes (Drake, Tuxedo Pooh) if tweet has TWO alternatives
 - Surprised Pikachu ONLY for obvious cause→effect
-- Match the "Vibe" and "Structure" to the template's strengths
-- DIVERSITY: Pick templates with DIFFERENT formats (don't pick 3 comparison memes!)
-- Prefer templates matching the tweet's topics
+- DIVERSITY: Pick templates with DIFFERENT formats
+- Prefer templates matching the tweet's humor tags AND topics
 
-TEMPLATES:
+### COMEDY RULES:
+1. **Incongruity** — Humor from unexpected pairing
+2. **Specificity > Generality** — Use exact entities from the tweet
+3. **Escalation** — Multi-panel: each step MORE extreme
+4. **The punchline is the IMAGE** — Don't describe what the image shows
+5. **Brevity** — Max 8 words per box. Fewer is better.
+6. **DON'T REPEAT THE TWEET** — Adapt the concept to the meme format
+
+### AVAILABLE TEMPLATES (top ${templates.filter(t => !excludeIds.includes(t.id)).length} scored):
 ${templateList}
 
-Reply with ONLY a JSON array of ${count} template IDs:
-["id1", "id2", "id3"]`;
+### OUTPUT:
+Reply with a JSON array of ${count} objects. For each, explain WHY you chose it, then write the caption:
+[
+  {
+    "templateId": "exact ID",
+    "templateName": "name",
+    "reasoning": "Why this template + this angle = funny",
+    "suggestedTopText": "...",
+    "suggestedBottomText": "...",
+    "panel1": "...",
+    "panel2": "...",
+    "panel3": "...",
+    "panel4": "..."
+  }
+]`;
 
   try {
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 200,
-      temperature: 0.5,
+      max_tokens: 2000,
+      temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const content = response.content[0];
     if (content.type === 'text') {
       const parsed = extractJson(content.text);
-      if (Array.isArray(parsed) && parsed.every(id => typeof id === 'string')) {
-        // Enforce diversity: check formats
-        const selectedIds = parsed.slice(0, count);
-        const diversified = enforceDiversity(selectedIds, templates, excludeIds);
-        console.log('Selected templates (with diversity):', diversified);
-        return diversified;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Build MemeMatch objects from parsed results
+        const matches: MemeMatch[] = [];
+
+        for (const m of parsed.slice(0, count)) {
+          const template = templates.find(t => t.id === m.templateId);
+          if (!template) continue;
+
+          const formatInfo = getMemeFormatInfo(template);
+          const isMultiPanel = formatInfo.format === 'multi-panel' || formatInfo.textBoxes.length > 2;
+          const clean = (s: unknown) => String(s || '').trim().slice(0, 150);
+
+          let textBoxes: TextBox[] = [];
+          if (isMultiPanel) {
+            if (m.panel1) textBoxes.push({ position: 'panel1', text: clean(m.panel1) });
+            if (m.panel2) textBoxes.push({ position: 'panel2', text: clean(m.panel2) });
+            if (m.panel3) textBoxes.push({ position: 'panel3', text: clean(m.panel3) });
+            if (m.panel4) textBoxes.push({ position: 'panel4', text: clean(m.panel4) });
+            if (textBoxes.length === 0) {
+              if (m.suggestedTopText) textBoxes.push({ position: 'top', text: clean(m.suggestedTopText) });
+              if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
+            }
+          } else {
+            if (m.suggestedTopText) textBoxes.push({ position: 'top', text: clean(m.suggestedTopText) });
+            if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
+            if (textBoxes.length === 0 && formatInfo.format === 'label') {
+              if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
+              else if (m.suggestedTopText) textBoxes.push({ position: 'center', text: clean(m.suggestedTopText) });
+            }
+          }
+
+          matches.push({
+            templateId: m.templateId,
+            templateName: m.templateName || template.name,
+            reasoning: m.reasoning || 'Comedy gold',
+            suggestedTopText: clean(m.suggestedTopText || m.panel1),
+            suggestedBottomText: clean(m.suggestedBottomText || m.panel2),
+            format: formatInfo.format,
+            textBoxes,
+          });
+        }
+
+        // Enforce diversity post-hoc
+        const diverseIds = enforceDiversity(
+          matches.map(m => m.templateId),
+          templates,
+          excludeIds
+        );
+        const diverseMatches = diverseIds
+          .map(id => matches.find(m => m.templateId === id))
+          .filter((m): m is MemeMatch => m !== undefined);
+
+        if (diverseMatches.length > 0) {
+          console.log('Selected + captioned:', diverseMatches.map(m => m.templateName).join(', '));
+          return diverseMatches;
+        }
       }
     }
   } catch (error) {
-    console.error('Template selection failed:', error);
+    console.error('Select + caption failed:', error);
   }
 
-  // Fallback: return top-scored template IDs with diversity
-  return enforceDiversity(
-    templates.slice(0, count * 2).map(t => t.id),
-    templates,
-    excludeIds
-  ).slice(0, count);
+  return [];
 }
 
 // NEW: Ensure result diversity - no more than 2 of the same format
@@ -394,172 +440,94 @@ function enforceDiversity(
 
 // Gold standard examples for few-shot learning
 const GOLD_STANDARD_EXAMPLES = `
-### EXAMPLE 1:
+### EXAMPLE 1 (Multi-panel escalation):
 TWEET: "I just spent 3 hours debugging a 5-line script that only had a typo."
 MEME: Clown Applying Makeup
 PANELS:
-1. "I'll just write this quick script."
-2. "Wait, why isn't it working?"
-3. "Refactoring the entire logic for 2 hours."
-4. "It was a missing semicolon."
-REASONING: Classic escalating self-own.
+1. "Quick 5-line script"
+2. "Why isn't it working?"
+3. "Refactoring everything"
+4. "It was a semicolon"
+WHY IT WORKS: Each panel escalates the absurdity. The punchline is the contrast between effort and cause.
 
-### EXAMPLE 2:
+### EXAMPLE 2 (Label/misidentification):
 TWEET: "My cat watching me work from home like I'm an intruder in his kingdom."
 MEME: Is This a Pigeon
 TEXT:
 - Me: "My Cat"
-- Object: "Me sitting at my desk"
+- Object: "Me at my own desk"
 - Caption: "Is this a trespasser?"
-REASONING: Confident misidentification.
+WHY IT WORKS: The meme image IS the joke (confident wrongness). Text just labels.
 
-### EXAMPLE 3:
+### EXAMPLE 3 (Multi-panel reveal):
 TWEET: "The job says 'competitive salary' but they don't list it in the posting."
 MEME: Anakin Padme 4 Panel
 PANELS:
-1. "It's a competitive salary."
-2. "So it's above market rate, right?"
+1. "Competitive salary"
+2. "Above market rate, right?"
 3. "..."
 4. "Right??"
-REASONING: Exposing the hidden red flag.
+WHY IT WORKS: The silence IS the punchline. Builds false hope then drops it.
+
+### EXAMPLE 4 (Comparison - A/B):
+TWEET: "Reading documentation vs asking ChatGPT"
+MEME: Drake Hotline Bling
+TEXT:
+- Top (reject): "Reading the docs"
+- Bottom (prefer): "Pasting error into ChatGPT"
+WHY IT WORKS: Extreme contrast between the responsible and lazy choice. Everyone relates.
+
+### EXAMPLE 5 (Reaction - cause/effect):
+TWEET: "Deployed to prod on Friday and went home"
+MEME: Surprised Pikachu
+TEXT:
+- Top: "Deploy on Friday, go home"
+- Bottom: "Everything breaks"
+WHY IT WORKS: The outcome is OBVIOUS. That's the joke. Don't add extra text.
+
+### EXAMPLE 6 (Single-text hot take):
+TWEET: "Most meetings could be emails. Change my mind"
+MEME: Change My Mind
+TEXT:
+- Center: "90% of meetings should be Slack messages"
+WHY IT WORKS: Reframes the tweet as an even MORE extreme take. Doesn't just repeat it.
+
+### EXAMPLE 7 (Top-bottom uncertainty):
+TWEET: "Is my code good or did nobody review the PR?"
+MEME: Futurama Fry
+TEXT:
+- Top: "Not sure if great code"
+- Bottom: "Or just no reviewers"
+WHY IT WORKS: Fits the "Not sure if X or Y" format perfectly. Specific to the situation.
+
+### EXAMPLE 8 (3-panel self-sabotage):
+TWEET: "Companies underpay employees then wonder why no one's loyal"
+MEME: Bike Fall
+TEXT:
+- Panel 1: "Companies"
+- Panel 2: "Minimum wage, no benefits"
+- Panel 3: "Why is nobody loyal??"
+WHY IT WORKS: The actor CAUSED the problem but blames others. Classic Bike Fall structure.
+
+### EXAMPLE 9 (4-panel escalation):
+TWEET: "My approach to problem solving: Google it, Stack Overflow, ask AI, rewrite from scratch"
+MEME: Expanding Brain
+TEXT:
+- Panel 1: "Google the error"
+- Panel 2: "Stack Overflow"
+- Panel 3: "Ask Claude"
+- Panel 4: "rm -rf and start over"
+WHY IT WORKS: Each panel is MORE extreme. The last one is absurdly nuclear.
+
+### EXAMPLE 10 (3-label agreement):
+TWEET: "Frontend devs and backend devs both blame the API"
+MEME: Epic Handshake
+TEXT:
+- Left arm: "Frontend devs"
+- Right arm: "Backend devs"
+- Handshake: "Blaming the API"
+WHY IT WORKS: Two opposites united by one specific, relatable thing. Three labels, no wasted words.
 `;
-
-// MM-003: Step 2 - Generate captions for selected templates
-// IMPROVED: "Comedy Writer" Engine - Uses deep context and specific meme rules
-async function generateCaptions(
-  tweet: string,
-  selectedTemplates: MemeTemplate[],
-  analysis: TweetAnalysis
-): Promise<MemeMatch[]> {
-  
-  const templateDetails = selectedTemplates.map((t, idx) => {
-    const info = getMemeFormatInfo(t);
-    const examples = info.exampleCaptions?.join(' | ') || 'None';
-    const boxesDesc = info.textBoxes.map(b => `${b.position}: ${b.purpose}`).join(', ');
-    const isMultiPanel = info.format === 'multi-panel' || info.textBoxes.length > 2;
-    
-    // Create specific instructions based on the meme format
-    let specificInstructions = "";
-    if (info.format === 'comparison') {
-      specificInstructions = "For COMPARISON memes: Make the contrast extreme and obvious. Left/Top is usually the 'boring/normal' thing, Right/Bottom is the 'wild/better/worse' thing.";
-    } else if (info.format === 'reaction') {
-      specificInstructions = "For REACTION memes: The top text should be the SITUATION (setup), the image itself is the reaction. Don't describe the reaction in text. Make the setup relatable.";
-    } else if (info.format === 'label') {
-      specificInstructions = "For LABEL memes: You are labeling objects in the scene. Keep text very short (1-4 words).";
-    }
-
-    return `### TEMPLATE ${idx + 1}: ${t.name} (ID: ${t.id})
-- **Format**: ${info.format}${isMultiPanel ? ' (MULTI-PANEL - use all boxes!)' : ''}
-- **The Vibe**: ${info.bestFor}
-- **Text Structure**: ${boxesDesc}
-- **Examples**: ${examples}
-- **Specific Guide**: ${specificInstructions}`;
-  }).join('\n\n');
-
-  const prompt = `You are a legendary comedy writer for a meme page. Your goal is to turn this tweet into a viral meme.
-
-### GOLD STANDARD EXAMPLES FOR INSPIRATION:
-${GOLD_STANDARD_EXAMPLES}
-
-### TARGET TWEET:
-"${tweet}"
-
-ANALYSIS:
-- **Core Point**: "${analysis.corePoint}"
-- **Vibe**: ${analysis.emotionalVibe || analysis.humorType}
-- **Suggested Structure**: ${analysis.memeStructure || 'N/A'}
-- **Entities**: ${analysis.keyEntities.join(', ')}
-
-INSTRUCTIONS:
-1. **DON'T JUST REPEAT THE TWEET.** This is the #1 rule. Adapt the *concept* to the meme format.
-2. **Show, Don't Tell.** If the meme image shows the emotion, don't write it in text.
-3. **Be Specific.** Use the specific entities from the tweet (e.g. if they mention "JavaScript", use "JavaScript", not "coding language").
-4. **Short & Punchy.** aim for <10 words per box.
-5. **Format-Aware.** Follow the "Specific Guide" for each template below exactly.
-6. **No "Me:" prefixes** unless absolutely necessary for the format.
-
-${templateDetails}
-
-Reply with a JSON array of caption objects:
-[
-  {
-    "templateId": "exact ID",
-    "templateName": "name",
-    "reasoning": "Brief explanation of why this angle is funny",
-    "suggestedTopText": "...",
-    "suggestedBottomText": "...",
-    "panel1": "...",
-    "panel2": "...",
-    "panel3": "...",
-    "panel4": "..."
-  }
-]`;
-
-  try {
-    const response = await getAnthropic().messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500, // Increased for creative freedom
-      temperature: 0.9, // Higher temp for better humor
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content = response.content[0];
-    if (content.type === 'text') {
-      const parsed = extractJson(content.text);
-      if (Array.isArray(parsed)) {
-        return parsed.map(m => {
-          const template = selectedTemplates.find(t => t.id === m.templateId);
-          const formatInfo = template ? getMemeFormatInfo(template) : null;
-          const isMultiPanel = formatInfo?.format === 'multi-panel' || (formatInfo?.textBoxes.length || 0) > 2;
-          
-          // Build textBoxes based on template format and returned keys
-          let textBoxes: TextBox[] = [];
-          
-          // Helper to clean text
-          const clean = (s: any) => String(s || '').trim().slice(0, 150);
-
-          if (isMultiPanel) {
-             // Explicit panels
-             if (m.panel1) textBoxes.push({ position: 'panel1', text: clean(m.panel1) });
-             if (m.panel2) textBoxes.push({ position: 'panel2', text: clean(m.panel2) });
-             if (m.panel3) textBoxes.push({ position: 'panel3', text: clean(m.panel3) });
-             if (m.panel4) textBoxes.push({ position: 'panel4', text: clean(m.panel4) });
-             
-             // Fallback if AI used top/bottom for a multi-panel meme
-             if (textBoxes.length === 0) {
-               if (m.suggestedTopText) textBoxes.push({ position: 'top', text: clean(m.suggestedTopText) });
-               if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
-             }
-          } else {
-            // Standard top/bottom
-            if (m.suggestedTopText) textBoxes.push({ position: 'top', text: clean(m.suggestedTopText) });
-            if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
-            
-            // Handle label memes that might only have one text
-            if (textBoxes.length === 0 && formatInfo?.format === 'label') {
-               if (m.suggestedBottomText) textBoxes.push({ position: 'bottom', text: clean(m.suggestedBottomText) });
-               else if (m.suggestedTopText) textBoxes.push({ position: 'center', text: clean(m.suggestedTopText) });
-            }
-          }
-          
-          return {
-            templateId: m.templateId,
-            templateName: m.templateName || template?.name || 'Meme',
-            reasoning: m.reasoning || 'Comedy gold',
-            suggestedTopText: clean(m.suggestedTopText || m.panel1),
-            suggestedBottomText: clean(m.suggestedBottomText || m.panel2),
-            format: formatInfo?.format || 'top-bottom',
-            textBoxes,
-          };
-        });
-      }
-    }
-  } catch (error) {
-    console.error('Caption generation failed:', error);
-  }
-
-  return [];
-}
 
 // MM-004: Self-critique and refine matches
 async function critiqueAndRefine(
@@ -570,9 +538,14 @@ async function critiqueAndRefine(
 ): Promise<MemeMatch[]> {
   if (matches.length === 0) return matches;
 
-  const matchesSummary = matches.map(m => 
-    `${m.templateName}: "${m.suggestedTopText}" / "${m.suggestedBottomText}"`
-  ).join('\n');
+  const matchesSummary = matches.map(m => {
+    const isMultiPanel = m.textBoxes.length > 2 || m.format === 'multi-panel';
+    if (isMultiPanel) {
+      const panelTexts = m.textBoxes.map(tb => `${tb.position}: "${tb.text}"`).join(' / ');
+      return `${m.templateName} [multi-panel]: ${panelTexts}`;
+    }
+    return `${m.templateName}: "${m.suggestedTopText}" / "${m.suggestedBottomText}"`;
+  }).join('\n');
 
   const prompt = `Critique these meme matches and fix any problems.
 
@@ -582,21 +555,23 @@ Analysis: ${analysis.humorType} humor, ${analysis.sentiment} sentiment
 CURRENT MATCHES:
 ${matchesSummary}
 
-CRITIQUE CHECKLIST:
-1. Is text TOO LONG (>8 words)? → Shorten it
-2. Is text GENERIC ("Me:", "When you", "POV")? → Make it specific
-3. Does the meme FORMAT match the tweet structure?
-   - Comparison memes need TWO alternatives
-   - Reaction memes need a cause→effect
-4. Is the caption ACTUALLY FUNNY?
+CRITIQUE CHECKLIST (be ruthless):
+1. **Standalone test** — Would someone who HASN'T seen the tweet still get the joke? If not, fix it.
+2. **Redundancy** — Does the text describe what the meme image already shows? (e.g., writing "surprised" on Surprised Pikachu). Remove it.
+3. **Length** — Any text box over 8 words? Shorten it. 3 words > 8 words.
+4. **Specificity** — Generic phrases like "When you", "Me:", "POV:", "Nobody:"? Replace with specific content.
+5. **Comedy structure** — Comparison memes: is the contrast EXTREME enough? Multi-panel: does it ESCALATE? Reaction: is the cause SPECIFIC?
+6. **Format integrity** — Multi-panel memes: ALL panels must be filled. Missing panels = broken meme.
 
 If ALL matches are good, reply: {"approved": true}
 
-If ANY match needs fixing, reply with the FIXED version:
+If ANY match needs fixing, reply with the FIXED version.
+For top/bottom memes use newTopText/newBottomText.
+For multi-panel memes use newPanel1/newPanel2/newPanel3/newPanel4.
 {
   "approved": false,
   "fixes": [
-    {"templateId": "id", "newTopText": "fixed", "newBottomText": "fixed", "issue": "what was wrong"}
+    {"templateId": "id", "newTopText": "fixed", "newBottomText": "fixed", "newPanel1": "", "newPanel2": "", "newPanel3": "", "newPanel4": "", "issue": "what was wrong"}
   ]
 }`;
 
@@ -610,8 +585,8 @@ If ANY match needs fixing, reply with the FIXED version:
 
     const content = response.content[0];
     if (content.type === 'text') {
-      const parsed = extractJson(content.text) as { approved?: boolean; fixes?: Array<{templateId: string; newTopText: string; newBottomText: string; issue: string}> } | null;
-      
+      const parsed = extractJson(content.text) as { approved?: boolean; fixes?: Array<{templateId: string; newTopText?: string; newBottomText?: string; newPanel1?: string; newPanel2?: string; newPanel3?: string; newPanel4?: string; issue: string}> } | null;
+
       if (parsed?.approved) {
         console.log('MM-004: Matches approved by self-critique');
         return matches;
@@ -621,18 +596,41 @@ If ANY match needs fixing, reply with the FIXED version:
         console.log('MM-004: Applying fixes:', parsed.fixes.map(f => f.issue).join(', '));
         return matches.map(match => {
           const fix = parsed.fixes?.find(f => f.templateId === match.templateId);
-          if (fix) {
+          if (!fix) return match;
+
+          const isMultiPanel = match.textBoxes.length > 2 || match.format === 'multi-panel';
+
+          if (isMultiPanel) {
+            // Preserve original textBoxes structure, only update text content
+            const panelMap: Record<string, string | undefined> = {
+              panel1: fix.newPanel1,
+              panel2: fix.newPanel2,
+              panel3: fix.newPanel3,
+              panel4: fix.newPanel4,
+            };
+            const updatedBoxes = match.textBoxes.map(tb => {
+              const newText = panelMap[tb.position];
+              return newText ? { ...tb, text: newText } : tb;
+            });
             return {
               ...match,
-              suggestedTopText: fix.newTopText || match.suggestedTopText,
-              suggestedBottomText: fix.newBottomText || match.suggestedBottomText,
-              textBoxes: [
-                { position: 'top', text: fix.newTopText || match.suggestedTopText },
-                { position: 'bottom', text: fix.newBottomText || match.suggestedBottomText },
-              ],
+              suggestedTopText: fix.newPanel1 || match.suggestedTopText,
+              suggestedBottomText: fix.newPanel2 || match.suggestedBottomText,
+              textBoxes: updatedBoxes,
             };
           }
-          return match;
+
+          // Standard top/bottom memes
+          return {
+            ...match,
+            suggestedTopText: fix.newTopText || match.suggestedTopText,
+            suggestedBottomText: fix.newBottomText || match.suggestedBottomText,
+            textBoxes: match.textBoxes.map(tb => {
+              if (tb.position === 'top' && fix.newTopText) return { ...tb, text: fix.newTopText };
+              if (tb.position === 'bottom' && fix.newBottomText) return { ...tb, text: fix.newBottomText };
+              return tb;
+            }),
+          };
         });
       }
     }
@@ -643,7 +641,7 @@ If ANY match needs fixing, reply with the FIXED version:
   return matches;
 }
 
-// Main two-step matching function with critique
+// Main matching function: select + caption (1 call) → critique (1 call)
 async function generateMemeMatches(
   tweet: string,
   templates: MemeTemplate[],
@@ -652,30 +650,18 @@ async function generateMemeMatches(
   feedback?: string
 ): Promise<MemeMatch[] | null> {
   const feedbackNote = feedback ? ` (User wants: ${feedback})` : '';
-  
-  console.log('MM-003 Step 1: Selecting templates...');
-  const selectedIds = await selectBestTemplates(
-    tweet + feedbackNote, 
-    templates, 
-    analysis, 
-    excludeIds, 
+
+  console.log('MM-003: Selecting templates + generating captions...');
+  let matches = await selectAndCaption(
+    tweet + feedbackNote,
+    templates,
+    analysis,
+    excludeIds,
     3
   );
-  
-  const selectedTemplates = selectedIds
-    .map(id => templates.find(t => t.id === id))
-    .filter((t): t is MemeTemplate => t !== undefined);
-  
-  if (selectedTemplates.length === 0) {
-    console.log('No templates selected, using fallback');
-    return null;
-  }
 
-  console.log('MM-003 Step 2: Generating captions...');
-  let matches = await generateCaptions(tweet, selectedTemplates, analysis);
-  
   if (matches.length === 0) {
-    console.log('Caption generation failed');
+    console.log('Select + caption failed');
     return null;
   }
 
@@ -685,173 +671,6 @@ async function generateMemeMatches(
   return matches.length > 0 ? matches : null;
 }
 
-// Legacy function for compatibility (deprecated)
-async function generateMemeMatchesLegacy(
-  tweet: string,
-  templates: MemeTemplate[],
-  analysis: TweetAnalysis,
-  excludeIds: string[] = [],
-  feedback?: string
-): Promise<MemeMatch[] | null> {
-  const templateContext = getCuratedTemplates(templates, excludeIds);
-  
-  const feedbackLine = feedback
-    ? `\nUser feedback: "${feedback}" - use this to pick DIFFERENT memes than before.\n`
-    : '';
-  
-  const excludeLine = excludeIds.length > 0
-    ? `\nDO NOT USE these template IDs (already shown): ${excludeIds.join(', ')}\n`
-    : '';
-
-  // Build analysis context for the prompt
-  const analysisContext = `
-## PRE-ANALYZED TWEET INFO:
-- **Sentiment**: ${analysis.sentiment}
-- **Humor Type**: ${analysis.humorType}${analysis.secondaryHumorType ? ` (secondary: ${analysis.secondaryHumorType})` : ''}
-- **Key Subjects**: ${analysis.keyEntities.length > 0 ? analysis.keyEntities.join(', ') : 'general'}
-- **Core Point**: "${analysis.corePoint}"
-- **Has Two Alternatives**: ${analysis.hasTwoAlternatives ? 'YES - good for comparison memes' : 'NO - avoid Drake/comparison memes'}
-- **Has Obvious Outcome**: ${analysis.hasObviousOutcome ? 'YES - good for Surprised Pikachu' : 'NO'}
-- **Is Self-Sabotage**: ${analysis.isSelfSabotage ? 'YES - perfect for Bike Fall' : 'NO'}
-`;
-
-  const prompt = `You are an elite meme creator. Use the pre-analyzed tweet info to pick PERFECT template matches.
-
-TWEET: "${tweet}"
-${analysisContext}
-${feedbackLine}${excludeLine}
-
-## TEMPLATE MATCHING RULES (USE THE ANALYSIS!):
-
-Based on humor type "${analysis.humorType}":
-${analysis.humorType === 'comparison' ? '→ USE: Drake, Tuxedo Pooh, Buff Doge vs Cheems' : ''}
-${analysis.humorType === 'irony' || analysis.humorType === 'sarcasm' ? '→ USE: This Is Fine, Bike Fall, Surprised Pikachu (if obvious outcome)' : ''}
-${analysis.humorType === 'hot-take' ? '→ USE: Change My Mind, Scroll of Truth' : ''}
-${analysis.humorType === 'complaint' ? '→ USE: Batman Slapping Robin, Y U No, First World Problems' : ''}
-${analysis.humorType === 'self-deprecation' ? '→ USE: Clown Applying Makeup, Bike Fall, Hide the Pain Harold' : ''}
-${analysis.humorType === 'roast' ? '→ USE: Batman Slapping Robin, Disaster Girl' : ''}
-${analysis.humorType === 'observation' ? '→ USE: Roll Safe, Futurama Fry, Third World Skeptical Kid' : ''}
-
-${!analysis.hasTwoAlternatives ? '⚠️ NO comparison memes (Drake, Tuxedo Pooh) - tweet lacks two alternatives!' : ''}
-${!analysis.hasObviousOutcome ? '⚠️ Avoid Surprised Pikachu unless you can frame an obvious cause→effect' : ''}
-${analysis.isSelfSabotage ? '✓ Bike Fall is a GREAT fit for this self-sabotage situation!' : ''}
-
-## CAPTION RULES:
-- MAX 6-8 words per text box
-- NO generic phrases like "Me:", "When you...", "POV:", "Nobody:"
-- Transform the core point: "${analysis.corePoint}" into meme format
-- The caption should work even without seeing the original tweet
-
-## AVAILABLE TEMPLATES:
-${templateContext}
-
-## OUTPUT FORMAT (JSON array only):
-[
-  {
-    "templateId": "exact ID from list",
-    "templateName": "template name", 
-    "reasoning": "Why this format matches the ${analysis.humorType} humor type",
-    "suggestedTopText": "short punchy text",
-    "suggestedBottomText": "short punchy text"
-  }
-]
-
-Return exactly 3 memes that match the analyzed humor type. Quality over generic choices.`;
-
-  try {
-    console.log('=== generateMemeMatches START ===');
-    console.log('API Key present:', !!process.env.ANTHROPIC_API_KEY);
-    console.log('API Key length:', process.env.ANTHROPIC_API_KEY?.length || 0);
-    console.log('Tweet:', tweet.slice(0, 50));
-    
-    const anthropic = getAnthropic();
-    console.log('Anthropic client created');
-    
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
-      temperature: 0.8,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    console.log('Claude response received');
-    console.log('Response content type:', response.content[0]?.type);
-
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      console.error('Non-text response from Claude');
-      return null;
-    }
-
-    console.log('Response text length:', content.text.length);
-    console.log('Response preview:', content.text.slice(0, 300));
-    
-    const parsed = extractJson(content.text);
-    
-    if (!Array.isArray(parsed)) {
-      console.error('Response is not an array. Parsed:', typeof parsed);
-      console.error('Full response:', content.text);
-      return null;
-    }
-
-    console.log('Parsed array length:', parsed.length);
-
-    // Validate and enrich matches
-    const validMatches: MemeMatch[] = [];
-    
-    for (const match of parsed) {
-      console.log('Processing match:', JSON.stringify(match).slice(0, 100));
-      
-      if (!match.templateId || !match.suggestedTopText || !match.suggestedBottomText) {
-        console.log('Skipping invalid match - missing fields');
-        continue;
-      }
-      
-      const template = templates.find((t) => t.id === match.templateId);
-      if (!template) {
-        console.log('Template not found:', match.templateId);
-        // Try to find by name instead
-        const byName = templates.find((t) => 
-          t.name.toLowerCase().includes(match.templateName?.toLowerCase() || '')
-        );
-        if (byName) {
-          console.log('Found by name instead:', byName.id);
-          match.templateId = byName.id;
-        } else {
-          continue;
-        }
-      }
-      
-      const finalTemplate = templates.find((t) => t.id === match.templateId);
-      if (!finalTemplate) continue;
-      
-      const formatInfo = getMemeFormatInfo(finalTemplate);
-      
-      validMatches.push({
-        templateId: match.templateId,
-        templateName: match.templateName || finalTemplate.name,
-        reasoning: match.reasoning || 'Great match for this tweet',
-        suggestedTopText: String(match.suggestedTopText).slice(0, 100),
-        suggestedBottomText: String(match.suggestedBottomText).slice(0, 100),
-        format: formatInfo.format,
-        textBoxes: [
-          { position: 'top', text: String(match.suggestedTopText).slice(0, 100) },
-          { position: 'bottom', text: String(match.suggestedBottomText).slice(0, 100) },
-        ],
-      });
-    }
-
-    console.log(`Valid matches found: ${validMatches.length}`);
-    console.log('=== generateMemeMatches END ===');
-    return validMatches.length > 0 ? validMatches.slice(0, 3) : null;
-  } catch (error) {
-    console.error('=== generateMemeMatches ERROR ===');
-    console.error('Error type:', error?.constructor?.name);
-    console.error('Error message:', error instanceof Error ? error.message : String(error));
-    console.error('Full error:', error);
-    return null;
-  }
-}
 
 // Intelligent fallback - still uses AI but with a simpler prompt + analysis
 async function generateFallbackMatches(
@@ -905,7 +724,7 @@ Reply with JSON array only:
     const response = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 800,
-      temperature: 0.9,
+      temperature: 0.7,
       messages: [{ role: 'user', content: simplePrompt }],
     });
 

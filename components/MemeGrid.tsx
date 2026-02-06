@@ -45,14 +45,10 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
       ctx.fillRect(0, 0, size, size);
       ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
 
-      const fontSize = Math.max(10, Math.min(13, size / 24));
-      ctx.font = `bold ${fontSize}px Impact, 'Arial Black', sans-serif`;
-      ctx.textAlign = 'center';
-
       const padding = 2;
       const maxTextWidth = size - padding * 2;
 
-      const wrapText = (text: string, maxWidth: number): string[] => {
+      const wrapText = (text: string, maxWidth: number, maxLines: number = 2): string[] => {
         const words = text.split(' ');
         const lines: string[] = [];
         let currentLine = '';
@@ -67,18 +63,19 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
           }
         }
         if (currentLine) lines.push(currentLine);
-        return lines.slice(0, 2);
+        return lines.slice(0, maxLines);
       };
 
-      const drawMemeText = (text: string, y: number, isTop: boolean) => {
-        const lines = wrapText(text.toUpperCase(), maxTextWidth);
-        const lineHeight = fontSize * 1.05;
+      const drawTextAt = (text: string, centerY: number, fontSize: number) => {
+        ctx.font = `bold ${fontSize}px Impact, 'Arial Black', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const lines = wrapText(text.toUpperCase(), maxTextWidth, 2);
+        const lineHeight = fontSize * 1.1;
+        const startY = centerY - ((lines.length - 1) * lineHeight) / 2;
 
         lines.forEach((line, index) => {
-          const lineY = isTop
-            ? y + index * lineHeight
-            : y - (lines.length - 1 - index) * lineHeight;
-
+          const lineY = startY + index * lineHeight;
           ctx.strokeStyle = 'black';
           ctx.lineWidth = fontSize * 0.18;
           ctx.lineJoin = 'round';
@@ -90,16 +87,32 @@ function MemePreview({ match }: { match: EnrichedMatch }) {
         });
       };
 
-      const topText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
-      const bottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
+      const isMultiPanel = match.textBoxes.length > 2 || match.format === 'multi-panel';
 
-      if (topText) {
-        ctx.textBaseline = 'top';
-        drawMemeText(topText, padding, true);
-      }
-      if (bottomText) {
-        ctx.textBaseline = 'bottom';
-        drawMemeText(bottomText, size - padding, false);
+      if (isMultiPanel) {
+        // Multi-panel: distribute text vertically across the canvas
+        const panelCount = match.textBoxes.length;
+        const bandHeight = (size - padding * 2) / panelCount;
+        const fontSize = Math.max(8, Math.min(11, size / (panelCount * 8)));
+
+        match.textBoxes.forEach((tb, i) => {
+          if (tb.text) {
+            const centerY = padding + bandHeight * i + bandHeight / 2;
+            drawTextAt(tb.text, centerY, fontSize);
+          }
+        });
+      } else {
+        // Standard top/bottom layout
+        const fontSize = Math.max(10, Math.min(13, size / 24));
+        const topText = match.textBoxes?.[0]?.text || match.suggestedTopText || '';
+        const bottomText = match.textBoxes?.[1]?.text || match.suggestedBottomText || '';
+
+        if (topText) {
+          drawTextAt(topText, padding + fontSize, fontSize);
+        }
+        if (bottomText) {
+          drawTextAt(bottomText, size - padding - fontSize, fontSize);
+        }
       }
 
       setIsLoaded(true);

@@ -183,6 +183,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Car swerving aggressively to the right exit.',
     bestFor: 'Ditching the "straight/sensible" path for the "chaotic/fun" path.',
+    humorTags: ['self-deprecation', 'relatable'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Straight: Productive evening / Exit: New Netflix series / Car: Me',
+      'Straight: Saving money / Exit: "Add to cart" / Car: My wallet',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'The straight path (Responsibility)' },
       { position: 'panel2', purpose: 'The exit (Chaos/Fun)' },
@@ -248,6 +254,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Panel 1: Rock smiling. Panel 2: Rock looking back in shock.',
     bestFor: 'A conversation that takes a sudden dark or weird turn.',
+    humorTags: ['absurdist', 'observation'],
+    topicTags: ['universal', 'relationships'],
+    exampleCaptions: [
+      'Top: So what do you do for fun? / Bottom: I debug CSS',
+      'Top: The date is going great / Bottom: She says "I use tabs"',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Normal conversational statement' },
       { position: 'bottom', purpose: 'The cursed follow-up detail' },
@@ -258,6 +270,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Girl smiling at camera while house burns behind her.',
     bestFor: 'Ignoring chaos, or secretly being the cause of the chaos.',
+    humorTags: ['sarcasm', 'roast'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Top: Accidentally deleted the production database / Bottom: My face in the standup',
+      'Top: The meeting could have been an email / Bottom: Me who scheduled it',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The chaotic situation' },
       { position: 'bottom', purpose: 'Me (unbothered/pleased)' },
@@ -268,6 +286,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Hand slamming blue button.',
     bestFor: 'Doing something immediately and without hesitation.',
+    humorTags: ['relatable', 'observation'],
+    topicTags: ['universal'],
+    exampleCaptions: [
+      'Top: Boss says "lets wrap up early" / Bottom: *SLAMS*',
+      'Top: Free food in the break room / Bottom: *SLAMS*',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The trigger/situation' },
       { position: 'bottom', purpose: 'The action you take immediately' },
@@ -278,6 +302,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Explorer finds scroll, reads it, throws it away shouting "NYEH!".',
     bestFor: 'Refusing to accept a hard fact because you don\'t like it.',
+    humorTags: ['hot-take', 'observation'],
+    topicTags: ['universal'],
+    exampleCaptions: [
+      'Top: Your code has no tests / Bottom: NYEH!',
+      'Top: You need 8 hours of sleep / Bottom: NYEH!',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The hard truth (on scroll)' },
       { position: 'bottom', purpose: '"NYEH!" (rejection)' },
@@ -288,6 +318,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Spongebob getting up from chair.',
     bestFor: 'Leaving a situation immediately. "I\'m done."',
+    humorTags: ['complaint', 'relatable'],
+    topicTags: ['universal', 'work', 'relationships'],
+    exampleCaptions: [
+      'Top: Meeting scheduled for 4:55 PM on Friday',
+      'Top: "Lets go around and share fun facts about ourselves"',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The situation causing you to leave' },
     ],
@@ -297,6 +333,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Leo DiCaprio pointing and laughing with a drink.',
     bestFor: 'Smug satisfaction. Seeing someone else make the mistake you knew they would.',
+    humorTags: ['roast', 'sarcasm'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Top: Junior dev says "this will be easy" / Bottom: Me who tried it last sprint',
+      'Top: Friend says theyll just use Excel / Bottom: Me, a data engineer',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The situation' },
       { position: 'bottom', purpose: 'My reaction (Smug)' },
@@ -307,6 +349,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Puppet looks side-eye, then looks away.',
     bestFor: 'Guilt. Pretending you didn\'t hear/see something because it applies to you.',
+    humorTags: ['self-deprecation', 'relatable'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Top: "Who left the code uncommented?" / Bottom: Me',
+      'Top: "Someone ate my lunch from the fridge" / Bottom: Me',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Accusation/Situation' },
       { position: 'bottom', purpose: 'Me (guilty)' },
@@ -373,6 +421,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Guy tapping head smiling.',
     bestFor: 'Bad advice that sounds smart. "Can\'t fail if you don\'t try".',
+    humorTags: ['sarcasm', 'absurdist'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Top: Cant have bugs / Bottom: If you dont write tests',
+      'Top: Cant be late to work / Bottom: If you never leave',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The problem' },
       { position: 'bottom', purpose: 'The "smart" (bad) solution' },
@@ -383,6 +437,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Anime guy pointing at butterfly.',
     bestFor: 'Confidently misidentifying something. Being totally wrong about what something is.',
+    humorTags: ['irony', 'observation'],
+    topicTags: ['universal', 'tech', 'work'],
+    exampleCaptions: [
+      'Me: Managers / Butterfly: Any minor issue / Caption: "Is this a blocker?"',
+      'Me: My brain / Butterfly: 2am thought / Caption: "Is this an emergency?"',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Me' },
       { position: 'center', purpose: 'The object (Butterfly)' },
@@ -412,6 +472,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'label',
     description: 'Bernie in coat asking for support.',
     bestFor: 'Shamelessly asking for the same thing again.',
+    humorTags: ['complaint', 'relatable'],
+    topicTags: ['universal', 'work'],
     textBoxes: [
       { position: 'bottom', purpose: 'What you are asking for' },
     ],
@@ -421,6 +483,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'label',
     description: 'Crazy hair guy with hands up.',
     bestFor: 'Explaining something with a conspiracy theory. Usually one word.',
+    humorTags: ['absurdist', 'sarcasm'],
+    topicTags: ['universal', 'tech'],
     textBoxes: [
       { position: 'bottom', purpose: 'The explanation (e.g. "Aliens")' },
     ],
@@ -470,6 +534,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Person running after balloon floating away, held back by something',
     bestFor: 'Losing something you want, things slipping away, priorities holding you back',
+    humorTags: ['relatable', 'self-deprecation'],
+    topicTags: ['universal', 'work', 'relationships'],
+    exampleCaptions: [
+      'Balloon: My free time / Person: Me / Holding back: Slack notifications',
+      'Balloon: Healthy sleep schedule / Person: Me / Holding back: One more episode',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Thing floating away (balloon)' },
       { position: 'panel2', purpose: 'Person chasing' },
@@ -499,6 +569,11 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Pablo Escobar standing alone looking sad and bored',
     bestFor: 'Loneliness despite success, boredom, waiting with nothing to do',
+    humorTags: ['self-deprecation', 'relatable'],
+    topicTags: ['universal', 'work', 'relationships'],
+    exampleCaptions: [
+      'Panel 1: Deploy on Friday / Panel 2: Waiting for bugs / Panel 3: Its Sunday and nothing broke... suspicious',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Context for emptiness' },
       { position: 'panel2', purpose: 'More waiting' },
@@ -510,6 +585,11 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Seagull inhaling deeply then screaming',
     bestFor: 'Building up to yelling, escalating frustration leading to outburst',
+    humorTags: ['complaint', 'absurdist'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Panel 1: Nice email / Panel 2: Per my last email / Panel 3: *inhales* / Panel 4: AS I ALREADY MENTIONED',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'Calm observation' },
       { position: 'panel2', purpose: 'Getting worked up' },
@@ -541,6 +621,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'label',
     description: 'Trump holding up signed document',
     bestFor: 'Official declarations, making something official/law, proclamations',
+    humorTags: ['hot-take', 'sarcasm'],
+    topicTags: ['universal', 'politics', 'work'],
+    exampleCaptions: [
+      'Friday afternoon deploys are now illegal',
+      'Reply-all emails are a fireable offense',
+    ],
     textBoxes: [
       { position: 'center', purpose: 'What is being declared/signed' },
     ],
@@ -550,6 +636,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Pam from Office saying two pictures are the same',
     bestFor: 'Two things that seem different but are actually identical, calling out sameness',
+    humorTags: ['observation', 'sarcasm'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Panel 1: My job title / Panel 2: My actual job / Panel 3: "Theyre the same picture"',
+      'Panel 1: Monday / Panel 2: Friday at 4:59 / Panel 3: Theyre the same picture',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'First thing' },
       { position: 'panel2', purpose: 'Second thing' },
@@ -563,6 +655,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Boromir saying "One does not simply..."',
     bestFor: 'Explaining why something is harder than people think, underestimated difficulty',
+    humorTags: ['observation', 'sarcasm'],
+    topicTags: ['universal', 'tech', 'work'],
+    exampleCaptions: [
+      'Top: One does not simply / Bottom: Merge to main on Friday',
+      'Top: One does not simply / Bottom: Leave a meeting on time',
+    ],
     textBoxes: [
       { position: 'top', purpose: '"One does not simply"' },
       { position: 'bottom', purpose: 'The thing thats actually difficult' },
@@ -573,6 +671,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Buzz Lightyear showing Woody something is everywhere',
     bestFor: 'Something being ubiquitous/everywhere, overwhelming presence of X',
+    humorTags: ['observation', 'complaint'],
+    topicTags: ['universal', 'tech', 'social-media'],
+    exampleCaptions: [
+      'Top: AI wrappers / Bottom: AI wrappers everywhere',
+      'Top: Subscription models / Bottom: Subscription models everywhere',
+    ],
     textBoxes: [
       { position: 'top', purpose: '"X"' },
       { position: 'bottom', purpose: '"X everywhere"' },
@@ -583,6 +687,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Skeleton on bench, has been waiting forever',
     bestFor: 'Waiting forever for something that never happens, infinite patience required',
+    humorTags: ['sarcasm', 'complaint'],
+    topicTags: ['universal', 'tech', 'work'],
+    exampleCaptions: [
+      'Top: Me waiting for the CI pipeline / Bottom: Still waiting',
+      'Top: Waiting for my PR review / Bottom: *skeleton*',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'What youre waiting for' },
       { position: 'bottom', purpose: 'Still waiting / how long' },
@@ -593,6 +703,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Old man smiling but clearly in pain',
     bestFor: 'Hiding suffering, pretending to be okay, forced smile through pain',
+    humorTags: ['self-deprecation', 'relatable'],
+    topicTags: ['universal', 'work'],
+    exampleCaptions: [
+      'Top: Manager asks "hows the project going?" / Bottom: Its on fire but I smile',
+      'Top: "Im fine" / Bottom: *3 hours of sleep*',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'The painful situation' },
       { position: 'bottom', purpose: 'Pretending its fine' },
@@ -603,6 +719,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'SpongeBob mocking with alternating caps',
     bestFor: 'Mocking what someone said, sarcastic repetition',
+    humorTags: ['roast', 'sarcasm'],
+    topicTags: ['universal', 'social-media'],
+    exampleCaptions: [
+      'Top: "I love Mondays" / Bottom: "i LoVe MoNdAyS"',
+      'Top: "This will only take 5 minutes" / Bottom: "tHiS wIlL oNlY tAkE 5 mInUtEs"',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'What they said (normal)' },
       { position: 'bottom', purpose: 'mOcKiNg VeRsIoN' },
@@ -613,6 +735,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Fry squinting, not sure if X or Y',
     bestFor: 'Uncertainty between two interpretations, suspicious questioning',
+    humorTags: ['observation', 'sarcasm'],
+    topicTags: ['universal', 'work', 'tech'],
+    exampleCaptions: [
+      'Top: Not sure if great code / Bottom: Or just no one reviewed it',
+      'Top: Not sure if productive / Bottom: Or just busy',
+    ],
     textBoxes: [
       { position: 'top', purpose: '"Not sure if X"' },
       { position: 'bottom', purpose: '"Or Y"' },
@@ -623,6 +751,12 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Leo raising glass in toast',
     bestFor: 'Toasting/saluting something, acknowledging achievement, cheers to X',
+    humorTags: ['wholesome', 'flex'],
+    topicTags: ['universal'],
+    exampleCaptions: [
+      'Top: To everyone who codes at 2am / Bottom: Cheers',
+      'Top: Survived another Monday / Bottom: *raises glass*',
+    ],
     textBoxes: [
       { position: 'top', purpose: 'Setup' },
       { position: 'bottom', purpose: 'What youre toasting to' },
@@ -633,6 +767,11 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Boss asks for suggestions, throws person out window for bad answer',
     bestFor: 'Unpopular but correct opinions getting rejected, good ideas punished',
+    humorTags: ['irony', 'roast'],
+    topicTags: ['work', 'universal'],
+    exampleCaptions: [
+      'Panel 1: How do we increase productivity? / Panel 2: More meetings / Panel 3: Longer hours / Panel 4: Fewer meetings',
+    ],
     textBoxes: [
       { position: 'panel1', purpose: 'The question/problem' },
       { position: 'panel2', purpose: 'Bad suggestion 1' },
@@ -645,6 +784,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Grandma at computer looking confused',
     bestFor: 'Tech confusion, discovering obvious internet things late, boomer moments',
+    humorTags: ['observation', 'wholesome'],
+    topicTags: ['tech', 'social-media'],
     textBoxes: [
       { position: 'top', purpose: 'The discovery/question' },
       { position: 'bottom', purpose: 'The naive conclusion' },
@@ -655,6 +796,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Angry stick figure asking "Y U NO"',
     bestFor: 'Frustration at something not happening, demanding X happens',
+    humorTags: ['complaint', 'roast'],
+    topicTags: ['universal'],
     textBoxes: [
       { position: 'top', purpose: 'Topic' },
       { position: 'bottom', purpose: '"Y U NO X?!"' },
@@ -665,6 +808,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Jimmy McMillan saying "is too damn high"',
     bestFor: 'Complaining something is excessive, too much X',
+    humorTags: ['complaint', 'observation'],
+    topicTags: ['universal', 'money'],
     textBoxes: [
       { position: 'top', purpose: 'The number/amount of X' },
       { position: 'bottom', purpose: '"Is too damn high!"' },
@@ -675,6 +820,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Office Space boss asking if you could do something',
     bestFor: 'Passive aggressive requests, asking for obvious things sarcastically',
+    humorTags: ['sarcasm', 'complaint'],
+    topicTags: ['work', 'universal'],
     textBoxes: [
       { position: 'top', purpose: '"If you could X"' },
       { position: 'bottom', purpose: '"That would be great"' },
@@ -685,6 +832,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Dos Equis guy saying he doesnt always X but when he does...',
     bestFor: 'Rare but specific behaviors, selective actions',
+    humorTags: ['sarcasm', 'flex'],
+    topicTags: ['universal'],
     textBoxes: [
       { position: 'top', purpose: '"I dont always X"' },
       { position: 'bottom', purpose: '"But when I do, Y"' },
@@ -695,6 +844,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Morpheus presenting a mind-blowing truth',
     bestFor: 'Revealing truth, "what if I told you" revelations',
+    humorTags: ['hot-take', 'observation'],
+    topicTags: ['universal', 'tech'],
     textBoxes: [
       { position: 'top', purpose: '"What if I told you"' },
       { position: 'bottom', purpose: 'The revelation' },
@@ -705,6 +856,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Ned Stark saying brace yourselves, X is coming',
     bestFor: 'Warning about something approaching/imminent, preparing for X',
+    humorTags: ['observation', 'sarcasm'],
+    topicTags: ['universal', 'social-media'],
     textBoxes: [
       { position: 'top', purpose: '"Brace yourselves"' },
       { position: 'bottom', purpose: '"X is coming"' },
@@ -715,6 +868,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Pepperidge Farm guy remembering the old days',
     bestFor: 'Nostalgia, remembering how things used to be, passive aggressive reminders',
+    humorTags: ['nostalgia', 'sarcasm'],
+    topicTags: ['universal', 'tech'],
     textBoxes: [
       { position: 'top', purpose: 'Remember when X?' },
       { position: 'bottom', purpose: '"Pepperidge Farm remembers"' },
@@ -725,6 +880,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Awkward school photo kid with terrible luck',
     bestFor: 'Bad luck scenarios, things going wrong, unfortunate outcomes',
+    humorTags: ['self-deprecation', 'irony'],
+    topicTags: ['universal'],
     textBoxes: [
       { position: 'top', purpose: 'Does something normal' },
       { position: 'bottom', purpose: 'Something terrible happens' },
@@ -735,6 +892,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Somali pirate saying look at me',
     bestFor: 'Taking over, becoming the new authority, power shifts',
+    humorTags: ['flex', 'roast'],
+    topicTags: ['universal', 'work'],
     textBoxes: [
       { position: 'top', purpose: '"Look at me"' },
       { position: 'bottom', purpose: '"Im the X now"' },
@@ -745,6 +904,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Jack Sparrow running away from crowd',
     bestFor: 'Being chased/attacked for unpopular opinion, running from consequences',
+    humorTags: ['hot-take', 'self-deprecation'],
+    topicTags: ['universal', 'social-media'],
     textBoxes: [
       { position: 'top', purpose: 'What you said/did' },
       { position: 'bottom', purpose: 'Everyone coming for you' },
@@ -755,6 +916,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Oprah giving things to everyone',
     bestFor: 'Everyone getting X, things being distributed widely, abundance',
+    humorTags: ['observation', 'absurdist'],
+    topicTags: ['universal'],
     textBoxes: [
       { position: 'top', purpose: '"You get X! You get X!"' },
       { position: 'bottom', purpose: '"Everyone gets X!"' },
@@ -765,6 +928,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Shaq sleeping vs Shaq alert',
     bestFor: 'Ignoring important things but caring about trivial things',
+    humorTags: ['comparison', 'relatable'],
+    topicTags: ['universal', 'work'],
     textBoxes: [
       { position: 'top', purpose: 'Important thing (sleeping/ignoring)' },
       { position: 'bottom', purpose: 'Trivial thing (wide awake/alert)' },
@@ -775,6 +940,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'TikTok trade offer guy presenting deal',
     bestFor: 'Proposing unfair trades, "deals" where one side clearly wins',
+    humorTags: ['sarcasm', 'roast'],
+    topicTags: ['universal', 'work', 'money'],
     textBoxes: [
       { position: 'panel1', purpose: 'I receive (what you want)' },
       { position: 'panel2', purpose: 'You receive (what you offer)' },
@@ -785,6 +952,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Trade offer format',
     bestFor: 'Unfair exchanges, bad deals, asymmetric trades',
+    humorTags: ['sarcasm', 'roast'],
+    topicTags: ['universal', 'work', 'money'],
     textBoxes: [
       { position: 'top', purpose: 'I receive' },
       { position: 'bottom', purpose: 'You receive' },
@@ -795,6 +964,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Woman crying about trivial problem',
     bestFor: 'Complaining about non-problems, privileged complaints, minor inconveniences',
+    humorTags: ['complaint', 'self-deprecation'],
+    topicTags: ['universal', 'money', 'food'],
     textBoxes: [
       { position: 'top', purpose: 'Privileged situation' },
       { position: 'bottom', purpose: 'The trivial "problem"' },
@@ -805,6 +976,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Johnny Depp comforting sad kid',
     bestFor: 'Delivering sad news gently, harsh truths told kindly',
+    humorTags: ['wholesome', 'irony'],
+    topicTags: ['universal', 'work'],
     textBoxes: [
       { position: 'panel1', purpose: 'Question/hope' },
       { position: 'panel2', purpose: 'Sad answer' },
@@ -816,6 +989,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Skeptical African kid',
     bestFor: 'Calling BS, skeptical reactions to claims, "so youre telling me" disbelief',
+    humorTags: ['sarcasm', 'observation'],
+    topicTags: ['universal', 'tech'],
     textBoxes: [
       { position: 'top', purpose: '"So youre telling me X"' },
       { position: 'bottom', purpose: '"And Y?" (skeptical)' },
@@ -826,6 +1001,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'comparison',
     description: 'Kermit with hooded evil Kermit',
     bestFor: 'Inner voice telling you to do bad things, temptation vs conscience',
+    humorTags: ['self-deprecation', 'relatable'],
+    topicTags: ['universal', 'food', 'money'],
     textBoxes: [
       { position: 'top', purpose: 'Sensible thought (Kermit)' },
       { position: 'bottom', purpose: 'Bad temptation (Evil Kermit)' },
@@ -836,6 +1013,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'Dave Chappelle scratching neck asking for more',
     bestFor: 'Craving/addiction, desperately wanting more of X',
+    humorTags: ['relatable', 'self-deprecation'],
+    topicTags: ['universal', 'tech', 'food'],
     textBoxes: [
       { position: 'top', purpose: '"Yall got any more of them"' },
       { position: 'bottom', purpose: 'Thing youre craving' },
@@ -846,6 +1025,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'top-bottom',
     description: 'SpongeBob making rainbow with hands saying "imagination"',
     bestFor: 'Wishful thinking, imaginary scenarios, things that only exist in dreams',
+    humorTags: ['sarcasm', 'observation'],
+    topicTags: ['universal', 'work'],
     textBoxes: [
       { position: 'top', purpose: 'What people think/imagine' },
       { position: 'bottom', purpose: '"Imagination" / the fantasy' },
@@ -856,6 +1037,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'reaction',
     description: 'Person looking in mirror seeing clown',
     bestFor: 'Realizing youre the fool, self-reflection showing youre wrong',
+    humorTags: ['self-deprecation', 'irony'],
+    topicTags: ['universal'],
     textBoxes: [
       { position: 'top', purpose: 'What you thought/did' },
       { position: 'bottom', purpose: 'Realizing youre the clown' },
@@ -866,6 +1049,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'label',
     description: 'Bernie asking for something again',
     bestFor: 'Repeatedly requesting something, having to ask again',
+    humorTags: ['complaint', 'relatable'],
+    topicTags: ['universal', 'work'],
     textBoxes: [
       { position: 'top', purpose: '"I am once again asking"' },
       { position: 'bottom', purpose: 'What youre asking for' },
@@ -876,6 +1061,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'label',
     description: 'Megamind with big forehead',
     bestFor: 'Calling out lack of X, "no X?" format',
+    humorTags: ['roast', 'sarcasm'],
+    topicTags: ['universal', 'social-media'],
     textBoxes: [
       { position: 'bottom', purpose: '"No X?"' },
     ],
@@ -885,6 +1072,8 @@ export const MEME_FORMAT_DATABASE: Record<string, Omit<MemeFormatInfo, 'id' | 'n
     format: 'multi-panel',
     description: 'Soldier shielding sleeping child from threats',
     bestFor: 'Something protecting you from threats, unsung heroes',
+    humorTags: ['wholesome', 'relatable'],
+    topicTags: ['universal', 'tech', 'work'],
     textBoxes: [
       { position: 'panel1', purpose: 'Threats/dangers' },
       { position: 'panel2', purpose: 'Protector' },
@@ -949,7 +1138,8 @@ export async function getExpandedMemeLibrary(): Promise<MemeTemplate[]> {
 export async function captionImage(
   templateId: string,
   topText: string,
-  bottomText: string
+  bottomText: string,
+  textBoxes?: Array<{ text: string; position: string }>
 ): Promise<string> {
   const username = process.env.IMGFLIP_USERNAME;
   const password = process.env.IMGFLIP_PASSWORD;
@@ -962,8 +1152,17 @@ export async function captionImage(
   formData.append('template_id', templateId);
   formData.append('username', username);
   formData.append('password', password);
-  formData.append('text0', topText);
-  formData.append('text1', bottomText);
+
+  // Use boxes[] format for multi-panel support (works for all memes)
+  if (textBoxes && textBoxes.length > 0) {
+    textBoxes.forEach((box, i) => {
+      formData.append(`boxes[${i}][text]`, box.text);
+    });
+  } else {
+    // Fallback to boxes[] format with top/bottom
+    formData.append('boxes[0][text]', topText);
+    formData.append('boxes[1][text]', bottomText);
+  }
 
   const response = await fetch('https://api.imgflip.com/caption_image', {
     method: 'POST',
