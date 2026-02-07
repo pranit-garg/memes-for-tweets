@@ -438,95 +438,37 @@ function enforceDiversity(
   return diverseIds;
 }
 
-// Gold standard examples for few-shot learning
+// Gold standard examples for few-shot learning (6 covering key formats)
 const GOLD_STANDARD_EXAMPLES = `
 ### EXAMPLE 1 (Multi-panel escalation):
 TWEET: "I just spent 3 hours debugging a 5-line script that only had a typo."
-MEME: Clown Applying Makeup
-PANELS:
-1. "Quick 5-line script"
-2. "Why isn't it working?"
-3. "Refactoring everything"
-4. "It was a semicolon"
-WHY IT WORKS: Each panel escalates the absurdity. The punchline is the contrast between effort and cause.
+MEME: Clown Applying Makeup → panel1: "Quick 5-line script" / panel2: "Why isn't it working?" / panel3: "Refactoring everything" / panel4: "It was a semicolon"
+WHY: Each panel escalates absurdity. Punchline = contrast between effort and cause.
 
-### EXAMPLE 2 (Label/misidentification):
-TWEET: "My cat watching me work from home like I'm an intruder in his kingdom."
-MEME: Is This a Pigeon
-TEXT:
-- Me: "My Cat"
-- Object: "Me at my own desk"
-- Caption: "Is this a trespasser?"
-WHY IT WORKS: The meme image IS the joke (confident wrongness). Text just labels.
-
-### EXAMPLE 3 (Multi-panel reveal):
-TWEET: "The job says 'competitive salary' but they don't list it in the posting."
-MEME: Anakin Padme 4 Panel
-PANELS:
-1. "Competitive salary"
-2. "Above market rate, right?"
-3. "..."
-4. "Right??"
-WHY IT WORKS: The silence IS the punchline. Builds false hope then drops it.
-
-### EXAMPLE 4 (Comparison - A/B):
+### EXAMPLE 2 (Comparison A/B):
 TWEET: "Reading documentation vs asking ChatGPT"
-MEME: Drake Hotline Bling
-TEXT:
-- Top (reject): "Reading the docs"
-- Bottom (prefer): "Pasting error into ChatGPT"
-WHY IT WORKS: Extreme contrast between the responsible and lazy choice. Everyone relates.
+MEME: Drake Hotline Bling → top: "Reading the docs" / bottom: "Pasting error into ChatGPT"
+WHY: Extreme contrast. The lazy choice wins. Everyone relates.
 
-### EXAMPLE 5 (Reaction - cause/effect):
+### EXAMPLE 3 (Reaction cause→effect):
 TWEET: "Deployed to prod on Friday and went home"
-MEME: Surprised Pikachu
-TEXT:
-- Top: "Deploy on Friday, go home"
-- Bottom: "Everything breaks"
-WHY IT WORKS: The outcome is OBVIOUS. That's the joke. Don't add extra text.
+MEME: Surprised Pikachu → top: "Deploy on Friday, go home" / bottom: "Everything breaks"
+WHY: Outcome is OBVIOUS. That IS the joke. Minimal text.
 
-### EXAMPLE 6 (Single-text hot take):
-TWEET: "Most meetings could be emails. Change my mind"
-MEME: Change My Mind
-TEXT:
-- Center: "90% of meetings should be Slack messages"
-WHY IT WORKS: Reframes the tweet as an even MORE extreme take. Doesn't just repeat it.
+### EXAMPLE 4 (Multi-panel reveal):
+TWEET: "The job says 'competitive salary' but they don't list it in the posting."
+MEME: Anakin Padme → panel1: "Competitive salary" / panel2: "Above market rate, right?" / panel3: "..." / panel4: "Right??"
+WHY: Silence IS the punchline. Builds hope then drops it.
 
-### EXAMPLE 7 (Top-bottom uncertainty):
-TWEET: "Is my code good or did nobody review the PR?"
-MEME: Futurama Fry
-TEXT:
-- Top: "Not sure if great code"
-- Bottom: "Or just no reviewers"
-WHY IT WORKS: Fits the "Not sure if X or Y" format perfectly. Specific to the situation.
-
-### EXAMPLE 8 (3-panel self-sabotage):
+### EXAMPLE 5 (3-panel self-sabotage):
 TWEET: "Companies underpay employees then wonder why no one's loyal"
-MEME: Bike Fall
-TEXT:
-- Panel 1: "Companies"
-- Panel 2: "Minimum wage, no benefits"
-- Panel 3: "Why is nobody loyal??"
-WHY IT WORKS: The actor CAUSED the problem but blames others. Classic Bike Fall structure.
+MEME: Bike Fall → panel1: "Companies" / panel2: "Minimum wage, no benefits" / panel3: "Why is nobody loyal??"
+WHY: Actor CAUSED the problem but blames others. Classic structure.
 
-### EXAMPLE 9 (4-panel escalation):
-TWEET: "My approach to problem solving: Google it, Stack Overflow, ask AI, rewrite from scratch"
-MEME: Expanding Brain
-TEXT:
-- Panel 1: "Google the error"
-- Panel 2: "Stack Overflow"
-- Panel 3: "Ask Claude"
-- Panel 4: "rm -rf and start over"
-WHY IT WORKS: Each panel is MORE extreme. The last one is absurdly nuclear.
-
-### EXAMPLE 10 (3-label agreement):
+### EXAMPLE 6 (3-label agreement):
 TWEET: "Frontend devs and backend devs both blame the API"
-MEME: Epic Handshake
-TEXT:
-- Left arm: "Frontend devs"
-- Right arm: "Backend devs"
-- Handshake: "Blaming the API"
-WHY IT WORKS: Two opposites united by one specific, relatable thing. Three labels, no wasted words.
+MEME: Epic Handshake → left: "Frontend devs" / right: "Backend devs" / center: "Blaming the API"
+WHY: Two opposites united by one specific thing. No wasted words.
 `;
 
 // MM-004: Self-critique and refine matches
@@ -961,9 +903,9 @@ export async function matchTweetToMemes(
   console.log('Tweet:', tweet);
   console.log('Excluded IDs:', excludeIds);
 
-  // MM-001: First, analyze the tweet
-  console.log('Step 1: Analyzing tweet...');
-  const analysis = await analyzeTweet(tweet);
+  // MM-001: Analyze the tweet locally (fast heuristic — saves one API round-trip)
+  console.log('Step 1: Analyzing tweet (local)...');
+  const analysis = fallbackAnalyzeTweet(tweet);
   console.log('Analysis complete:', analysis.humorType, analysis.sentiment);
 
   // MM-002: Score all templates based on the analysis

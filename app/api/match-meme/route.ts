@@ -3,6 +3,9 @@ import { getMemeTemplates, getTemplateById, getMemeFormatInfo } from '@/lib/imgf
 import { matchTweetToMemes, MemeMatch } from '@/lib/claude';
 import { incrementUsage, isPremium } from '@/lib/usage';
 
+// Allow up to 60s for AI pipeline (analyze + select/caption + critique)
+export const maxDuration = 60;
+
 export interface MatchMemeRequest {
   tweet: string;
   feedback?: string;
